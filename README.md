@@ -20,8 +20,8 @@ Plugin to execute Hax package from Scipion.
 
 We recommend installing Hax in production mode using the Scipion Plugin manager or by running the command:
 
-[!WARNING]
-The following command assumes that you have defined an alias to the Scipion executable named `scipion3`
+> [!WARNING]
+> The following command assumes that you have defined an alias to the Scipion executable named `scipion3`
 
 ```bash
 
@@ -31,8 +31,8 @@ The following command assumes that you have defined an alias to the Scipion exec
 
 If you are a developer, you might want to installed the plugin in development mode. In this case, please, clone this repository to your machine and install the plugin with the following command:
 
-[!WARNING]
-The following command assumes that you have defined an alias to the Scipion executable named `scipion3`
+> [!WARNING]
+> The following command assumes that you have defined an alias to the Scipion executable named `scipion3`
 
 ```bash
 
@@ -42,5 +42,5 @@ The following command assumes that you have defined an alias to the Scipion exec
 
 In both cases, the Plugin will automatically create a Conda environment to isolate Hax from other installations. Thus, you must have Conda installed in your machine.
 
-[!WARNING]
-Hax currently supports NVIDIA drivers version: >= 525 (Cuda 12 will be installed along the package, so there is no need to have CUDA already installed in your system).
+> [!WARNING]
+> Hax currently supports NVIDIA drivers version: >= 525 (Cuda 12 will be installed along the package, so there is no need to have CUDA already installed in your system).
