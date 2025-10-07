@@ -50,6 +50,18 @@ author = "Herreros, D., Kiska, J., Ramirez-Aportela, E. et al.",
 keywords = "Single particle analysis Heterogeneity",
 }
 
+@article{FlexHub2023,
+title = "Scipion Flexibility Hub: an integrative framework for advanced analysis of conformational heterogeneity in cryoEM",
+journal = "Acta Cryst. D",
+volume = "79",
+pages = "569-584",
+year = "2023",
+doi = "https://doi.org/10.1107/S2059798323004497",
+url = "https://journals.iucr.org/d/issues/2023/07/00/ic5121/index.html",
+author = "Herreros, D., Krieger, J.M., Fonseca, Y., et al.",
+keywords = "Single particle analysis Heterogeneity",
+}
+
 @article{HetSIREN2025,
 title = "Real-space heterogeneous reconstruction, refinement, and disentanglement of CryoEM conformational states with HetSIREN",
 journal = "Nature Communications",
