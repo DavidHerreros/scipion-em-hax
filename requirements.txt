@@ -1,0 +1,4 @@
+scipion-em>=3.5.0
+scipion-app>=3.3.1
+scipion-pyworkflow>=3.7.0
+xmipp_metadata<=1.2.0
