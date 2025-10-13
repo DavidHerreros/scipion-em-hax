@@ -27,20 +27,9 @@
 
 
 import os
-
-import re
-
-import importlib
+import subprocess
 
 import pyworkflow.plugin as pwplugin
-import pyworkflow.utils as pwutils
-
-from pwem import Config as emConfig
-
-from scipion.utils import getScipionHome
-
-import flexutils
-from flexutils.constants import CONDA_YML
 
 
 __version__ = "0.1.0"
@@ -57,12 +46,22 @@ class Plugin(pwplugin.Plugin):
     @classmethod
     def getProgram(cls, program, gpu):
         """ Return the program binary that will be used. """
-        cmd = '%s %s && ' % (cls.getCondaActivationCmd(), cls.getEnvActivation())
-        return cmd + 'project_manager --gpu %(gpu)s %(program)s ' % locals()
+        cmd = f'{cls.getCondaActivationCmd()} {cls.getEnvActivation()} && '
+        return cmd + f'project_manager --gpu {gpu} {program} '
 
     @classmethod
     def getCommand(cls, program, gpu, args):
         return cls.getProgram(program, gpu) + args
+
+    @classmethod
+    def getAnnotateSpaceFunctionsPath(cls):
+        cmd = f'{cls.getCondaActivationCmd()} {cls.getEnvActivation()} && '
+        cmd += "python -c import hax; print(hax.__file__)"
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        module_path = result.stdout.strip()
+
+        return os.path.join(module_path, "viewers", "annotate_space", "server_loading_functions", "load_model.py")
 
     def defineBinaries(cls, env):
         intallation_commands = []
