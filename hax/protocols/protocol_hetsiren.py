@@ -97,8 +97,7 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
                             "* *Precorrect: similar to Wiener but CTF has already been corrected")
 
         form.addSection(label='Network')
-        form.addParam('fineTune', params.BooleanParam, default=False,
-                      label='Type of reloading?', display=params.EnumParam.DISPLAY_HLIST,
+        form.addParam('fineTune', params.BooleanParam, default=False, label='Fine tune previous network?',
                       help='If fineTune, a previously trained HetSIREN network will be fine tuned based on the '
                            'new input parameters.')
 

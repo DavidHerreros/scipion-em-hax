@@ -63,10 +63,9 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
                        label="Choose GPU IDs",
                        help="Add a list of GPU devices that can be used")
 
-        group = form.addGroup("Data")
-        group.addParam('inputSets', params.MultiPointerParam, label="Input particles", pointerClass='SetOfParticlesFlex')
+        form.addParam('inputSets', params.MultiPointerParam, label="Input particles", pointerClass='SetOfParticlesFlex')
 
-        group = form.addGroup("Latent Space")
+        group = form.addGroup("Latent Space", expertLevel=params.LEVEL_ADVANCED)
         group.addParam('setManual', params.BooleanParam, default=False, label='Set manually latent space dimension?',
                        expertLevel=params.LEVEL_ADVANCED,
                        help="If set to No, consensus space dimensions will be set automatically to the minimum dimension "
@@ -77,8 +76,7 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
                        help="Dimension of the FlexConsensus bottleneck (latent space dimension)")
 
         form.addSection(label='Network')
-        form.addParam('fineTune', params.EnumParam, default=False,
-                      label='Type of reloading?', display=params.EnumParam.DISPLAY_HLIST,
+        form.addParam('fineTune', params.BooleanParam, default=False, label='Fine tune previous network?',
                       help='If fineTune, a previously trained deepPose network will be fine tuned based on the '
                            'new input parameters.')
 
