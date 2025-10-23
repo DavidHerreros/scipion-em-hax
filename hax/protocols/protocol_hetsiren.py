@@ -320,7 +320,7 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
             outVol = Volume()
             outVol.setSamplingRate(inputParticles.getSamplingRate())
 
-            ImageHandler().scaleSplines(os.path.join(out_path, f"decoded_volume_{idx:04d}.mrc"),
+            ImageHandler().scaleSplines(os.path.join(out_path_vols, f"decoded_volume_{idx:04d}.mrc"),
                                         os.path.join(out_path_vols, f"decoded_volume_{idx:04d}.mrc"),
                                         finalDimension=inputParticles.getXDim(), overwrite=True)
 
