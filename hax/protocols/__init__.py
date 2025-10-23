@@ -26,4 +26,4 @@
 # *
 # **************************************************************************
 
-from .protocol_angular_align_het_siren import JaxProtAngularAlignmentHetSiren
+from .protocol_hetsiren import JaxProtAngularAlignmentHetSiren
