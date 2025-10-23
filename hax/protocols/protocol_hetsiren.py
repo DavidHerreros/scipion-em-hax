@@ -102,11 +102,6 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
                       help='If fineTune, a previously trained HetSIREN network will be fine tuned based on the '
                            'new input parameters.')
 
-        form.addParam('netProtocol', params.PointerParam, label="Previously trained network",
-                      allowsNull=True,
-                      pointerClass='JaxProtAngularAlignmentHetSiren',
-                      condition="fineTune==True")
-
         form.addParam('lazyLoad', params.BooleanParam, default=False,
                       expertLevel=params.LEVEL_ADVANCED, label='Lazy loading into RAM',
                       help='If provided, images will be loaded to RAM. This is recommended if you want the best performance '
@@ -258,7 +253,10 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
             gpu = ''
 
         program = hax.Plugin.getProgram("hetsiren.py", gpu)
-        self.runJob(program, args + '--mode train', numberOfMpi=1)
+        self.runJob(program,
+                    args + f'--mode train --reload {self._getExtraPath("HetSIREN")}'
+                    if self.fineTune else args + '--mode train',
+                    numberOfMpi=1)
         self.runJob(program, args + f'--mode predict --reload {self._getExtraPath("HetSIREN")}', numberOfMpi=1)
 
     def createOutputStep(self):
