@@ -90,15 +90,16 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         group.addParam('ctfType', params.EnumParam, choices=['None', 'Apply', 'Wiener', 'Precorrect'],
                        default=1, label="CTF correction type",
                        display=params.EnumParam.DISPLAY_HLIST,
-                       condition="applyCTF", expertLevel=params.LEVEL_ADVANCED,
-                       help="* *Apply*: CTF is applied to the projection generated from the reference map\n"
+                       expertLevel=params.LEVEL_ADVANCED,
+                       help="* *None*: CTF will not be considered\n"
+                            "* *Apply*: CTF is applied to the projection generated from the reference map\n"
                             "* *Wiener*: input particle is CTF corrected by a Wiener fiter\n"
                             "* *Precorrect: similar to Wiener but CTF has already been corrected")
 
         form.addSection(label='Network')
-        form.addParam('fineTune', params.EnumParam, default=False,
+        form.addParam('fineTune', params.BooleanParam, default=False,
                       label='Type of reloading?', display=params.EnumParam.DISPLAY_HLIST,
-                      help='If fineTune, a previously trained deepPose network will be fine tuned based on the '
+                      help='If fineTune, a previously trained HetSIREN network will be fine tuned based on the '
                            'new input parameters.')
 
         form.addParam('netProtocol', params.PointerParam, label="Previously trained network",
@@ -120,7 +121,7 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
                        expertLevel=params.LEVEL_ADVANCED,
                        help="Dimension of the HetSIREN bottleneck (latent space dimension)")
 
-        group.addParam('epochs', params.IntParam, default=20, condition="stopType==1",
+        group.addParam('epochs', params.IntParam, default=50,
                        label='Number of training epochs')
 
         group.addParam('batchSize', params.IntParam, default=8, label='Number of images in batch',
@@ -129,7 +130,7 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
                             "In this case, value should be decreased.")
 
         form.addSection(label='Reconstruction')
-        form.addParam('massTransport', params.BooleanParam, condition='not localRecon', default=True,
+        form.addParam('massTransport', params.BooleanParam, default=True,
                       expertLevel=params.LEVEL_ADVANCED,
                       label='Mass transportation',
                       help='When set, HetSIREN will be able to "move" the mass inside the mask '
