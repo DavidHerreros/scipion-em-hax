@@ -227,15 +227,18 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         newXdim = self.boxSize.get()
         correctionFactor = self.inputParticles.get().getXDim() / newXdim
         sr = correctionFactor * self.inputParticles.get().getSamplingRate()
-        args = "--md %s --vol %s --mask %s --sr %f --lat_dim %d --epochs %d --batch_size %d --output_path %s " \
-               % (md_file, vol_file, mask_file, sr, latDim, epochs, batch_size, out_path)
+        args = "--md %s --mask %s --sr %f --lat_dim %d --epochs %d --batch_size %d --output_path %s " \
+               % (md_file, mask_file, sr, latDim, epochs, batch_size, out_path)
 
-        if self.ctf_type != 0:
-            if self.ctf_type.get() == 1:
+        if self.inputVolume.get():
+            args += '--vol %s ' % vol_file
+
+        if self.ctfType != 0:
+            if self.ctfType.get() == 1:
                 args += '--ctf_type apply '
-            elif self.ctf_type.get() == 2:
+            elif self.ctfType.get() == 2:
                 args += '--ctf_type wiener '
-            elif self.ctf_type.get() == 3:
+            elif self.ctfType.get() == 3:
                 args += '--ctf_type precorrect '
 
         if self.lazyLoad:
@@ -251,7 +254,7 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         else:
             gpu = ''
 
-        program = hax.Plugin.getProgram("hetsiren.py", gpu)
+        program = hax.Plugin.getProgram("hetsiren", gpu)
         self.runJob(program,
                     args + f'--mode train --reload {self._getExtraPath("HetSIREN")}'
                     if self.fineTune else args + '--mode train',
@@ -293,12 +296,12 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
             inputMask = self.inputVolumeMask.get().getFileName()
             partSet.refMask = String(inputMask)
 
-        if self.ctf_type.get() != 0:
+        if self.ctfType.get() != 0:
             if self.ctfType.get() == 1:
                 partSet.getFlexInfo().ctfType = String("apply")
             elif self.ctfType.get() == 1:
                 partSet.getFlexInfo().ctfType = String("wiener")
-            elif self.ctf_type.get() == 2:
+            elif self.ctfType.get() == 2:
                 partSet.getFlexInfo().ctfType = String("precorrect")
 
         if self.useGpu.get():
@@ -310,7 +313,7 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         np.savetxt(latents_file_txt, latent_space)
 
         args = "--latents_file %s --output_path %s" % (latents_file_txt, out_path_vols)
-        program = hax.Plugin.getProgram("decode_states_from_latents.py", gpu)
+        program = hax.Plugin.getProgram("decode_states_from_latents", gpu)
         self.runJob(program, args, numberOfMpi=1)
 
         outVols = self._createSetOfVolumes()

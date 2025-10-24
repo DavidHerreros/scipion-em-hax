@@ -101,21 +101,18 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
             pwutils.makePath(data_path)
 
         idx = 0
-        for pointer_set in self.inputSets:
-            particle_set = pointer_set.get()
+        for inputSet in self.inputSets:
+            particle_set = inputSet.get()
 
-            # Get data filename
             progName = particle_set.getFlexInfo().getProgName()
             data_file = progName + f"_{idx}.txt"
 
-            # Read flexible space form particles
             z_flex = []
             for particle in particle_set.iterItems():
                 z_flex.append(particle.getZFlex())
             z_flex = np.vstack(z_flex)
-
-            # Save flexible space
-            np.savetxt(os.path.join(data_path, data_file), z_flex)
+            latent_space = os.path.join(data_path, data_file)
+            np.savetxt(latent_space, z_flex)
 
             idx += 1
 
@@ -125,7 +122,7 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
         batch_size = self.batch_size.get()
         epochs = self.epochs.get()
         lat_dim = self.latDim.get()
-        args = "--input_space %s --epochs %d --batch_size %d -out_path %s" % (data_path, epochs, batch_size, out_path)
+        args = "--input_space %s --epochs %d --batch_size %d --output_path %s " % (data_path, epochs, batch_size, out_path)
 
         if self.setManual:
             args += '--lat_dim %d ' % lat_dim
@@ -135,7 +132,7 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
         else:
             gpu = ''
 
-        program = hax.Plugin.getProgram("flexconsensus.py", gpu)
+        program = hax.Plugin.getProgram("flexconsensus", gpu)
         self.runJob(program,
                     args + f'--mode train --reload {self._getExtraPath("FlexConsensus")}'
                     if self.fineTune else args + '--mode train',
@@ -181,7 +178,7 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
 
         for file in latents_path:
             args = "--latents_file %s --output_path %s" % (file, out_path_vols)
-            program = hax.Plugin.getProgram("decode_states_from_latents.py", gpu)
+            program = hax.Plugin.getProgram("decode_states_from_latents", gpu)
             self.runJob(program, args, numberOfMpi=1)
 
         outVols = self._createSetOfVolumes()
