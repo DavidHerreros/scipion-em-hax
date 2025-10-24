@@ -28,7 +28,7 @@
 
 import os
 import numpy as np
-from glob import glob
+from sklearn.cluster import KMeans
 
 from xmipp_metadata.metadata import XmippMetaData
 from xmipp_metadata.image_handler import ImageHandler
@@ -37,7 +37,7 @@ import pyworkflow.protocol.params as params
 from pyworkflow.object import String
 from pyworkflow.utils.path import moveFile
 from pyworkflow import VERSION_1
-from pyworkflow.utils import getExt
+from pyworkflow.utils import getExt, makePath
 
 from pwem.protocols import ProtAnalysis3D, ProtFlexBase
 from pwem.objects import Volume, ParticleFlex
@@ -48,7 +48,7 @@ from xmipp3.convert import createItemMatrix, setXmippAttributes, writeSetOfParti
 import hax
 import hax.constants as const
 
-class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
+class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
     """ Protocol for angular alignment with heterogeneous reconstruction with the HetSIREN algorithm."""
     _label = 'flexible align - HetSIREN'
     _lastUpdateVersion = VERSION_1
@@ -67,25 +67,46 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
                        help="Add a list of GPU devices that can be used")
 
         group = form.addGroup("Data")
-        group.addParam('inputParticles', params.PointerParam, label="Input particles", pointerClass='SetOfParticles')
+        group.addParam('inputParticles', params.PointerParam, label="Input particles", pointerClass='SetOfParticles',
+                       important=True)
 
         group.addParam('inputVolume', params.PointerParam, allowsNull=True,
                        label="Starting volume", pointerClass='Volume',
-                       help="If provided, the HomoSIREN network will learn to refine with the new learned angles. "
-                            "Otherwise, the network will learn the reconstruction of the map from scratch")
+                       help="If not provided, HetSIREN will learn from scratch how to recover heterogeneous states. If a "
+                            "volume is provided, HetSIREN will use that volume as its starting state, and learn how to "
+                            "modify it towards the heterogeneous states present in the data.\n\n"
+                            "When should a map be provided?\n"
+                            "    - If transport mass mode is set to Yes (check Advanced parameter in Reconstruction tab), it is "
+                            "advisable to provide an input map\n"
+                            "    - If transport mass mode is set to Yes and "
+                            "If transport mass mode is set to No and local reconstruction is enabled (check Advanced "
+                            "parameter in Reconstruction tab), it is highly recommended to provide a map\n\n"
+                            "When is not advisable to provide a map?\n"
+                            "If transport mass and local reconstruction are ser to No (check Advanced parameter in "
+                            "Reconstruction tab), we recommend leaving this  parameter empty to give HetSIREN more freedom "
+                            "to denoise and learn accurate states.")
 
         group.addParam('inputVolumeMask', params.PointerParam,
                        label="Reconstruction mask", pointerClass='VolumeMask', allowsNull=True,
-                       help="If provided, the pose refinement and reconstruction learned by HomoSIREN will be focused "
-                            "in the region delimited by the mask. Otherise, a sphere inscribed in the volume box will "
-                            "be used")
+                       help="Reconstruction mask meaning will depend on the mode chosen (NOTE: masks provided here MUST "
+                            "be BINARY):\n\n"
+                            "Transport mass is set to Yes\n"
+                            "In this case, the provided mask will determine which voxels can be moved inside the volume box. "
+                            "If you have provided an input volume, you can provide here a tight mask or a dilated tight mask, as HetSIREN "
+                            "will be able to move those voxels anywhere needed to recover a given heterogeneous state. If don't provide an input "
+                            "volume, we recommend providing a mask with enough mass to recover all expected states. A good rule of thumb "
+                            "for this case is to provide a spherical mask with radious 0.25 * box_size.\n\n"
+                            "Transport mass is set to No\n"
+                            "If local reconstruction is set to No, we recommend to leave this parameter empty. If local reconstruction is "
+                            "enabled, you should provide here a mask enclosing your region of interest AND any region where the motion of the "
+                            "protein is expected to happen. Remember that, in Reconstruction mode (i.e., Transport mass is set to No), HetSIREN "
+                            "will assume voxels as fixed in space. Any motions happening outside the binary mask will NOT be considered.")
 
         group.addParam('boxSize', params.IntParam, default=128,
                        label='Downsample particles to this box size',
-                       help='In general, downsampling the particles will increase performance without compromising '
-                            'the estimation the deformation field for each particle. Note that output particles will '
-                            'have the original box size, and Zernike3D coefficients will be modified to work with the '
-                            'original size images')
+                       help='If your GPU is not able to fit your particles in memory, you can play with this parameter to downsample your images. '
+                            'In this way, you will be able to fit your particles at the expense of losing resolution in the volumes generated by the '
+                            'network.')
 
         group.addParam('ctfType', params.EnumParam, choices=['None', 'Apply', 'Wiener', 'Precorrect'],
                        default=1, label="CTF correction type",
@@ -98,8 +119,8 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
 
         form.addSection(label='Network')
         form.addParam('fineTune', params.BooleanParam, default=False, label='Fine tune previous network?',
-                      help='If fineTune, a previously trained HetSIREN network will be fine tuned based on the '
-                           'new input parameters.')
+                      help='When set to Yes, you will be able to provide a previously trained HetSIREN network to refine it with new '
+                           'data. If set to No, you will train a new HetSIREN network from scratch.')
 
         form.addParam('lazyLoad', params.BooleanParam, default=False,
                       expertLevel=params.LEVEL_ADVANCED, label='Lazy loading into RAM',
@@ -116,12 +137,26 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
                        help="Dimension of the HetSIREN bottleneck (latent space dimension)")
 
         group.addParam('epochs', params.IntParam, default=50,
-                       label='Number of training epochs')
+                       label='Number of training epochs',
+                       help="Number of epochs to train the network (i.e. how many times to loop over the whole dataset "
+                             "of images - set to default to 50 - as a rule of thumb, consider 50 to 100 epochs enough "
+                             "for 100k images / if your dataset is bigger or smaller, scale this value proportionally to it")
 
         group.addParam('batchSize', params.IntParam, default=8, label='Number of images in batch',
-                       help="Number of images that will be used simultaneously for every training step. "
-                            "We do not recommend to change this value unless you experience memory errors. "
-                            "In this case, value should be decreased.")
+                       help="Determines how many images will be load in the GPU at any moment during training (set by "
+                            "default to 8 - you can control GPU memory usage easily by tuning this parameter to fit your "
+                            "hardware requirements - we recommend using tools like nvidia-smi to monitor and/or measure "
+                            "memory usage and adjust this value - keep also in mind that bigger batch sizes might be "
+                            "less precise when looking for very local motions")
+
+        group.addParam('learningRate', params.FloatParam, default=1e-4, label='Learning rate',
+                       help="The learning rate (lr) sets the speed of learning. Think of the model as trying to find the "
+                            "lowest point in a valley; the lr is the size of the step it takes on each attempt. A large "
+                            "lr (e.g., 0.01) is like taking huge leaps — it's fast but can be unstable, overshoot the "
+                            "lowest point, or cause NAN{ errors. A small lr (e.g., 1e-6) is like taking tiny shuffles — "
+                            "it's stable but very slow and might get stuck before reaching the bottom. A good default is "
+                            "often 0.0001. If training fails or errors explode, try making the lr 10 times smaller (e.g., "
+                            "0.001 --> 0.0001).")
 
         form.addSection(label='Reconstruction')
         form.addParam('massTransport', params.BooleanParam, default=True,
@@ -146,6 +181,7 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         """ Centralize how files are called """
         myDict = {
             'imgsFn': self._getExtraPath('input_particles.xmd'),
+            'predictedFn': self._getExtraPath('predicted_latents.xmd'),
             'fnVol': self._getExtraPath('volume.mrc'),
             'fnVolMask': self._getExtraPath('mask.mrc'),
         }
@@ -222,16 +258,20 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         if not os.path.isdir(out_path):
             os.mkdir(out_path)
         batch_size = self.batchSize.get()
+        learningRate = self.learningRate.get()
         epochs = self.epochs.get()
         latDim = self.latDim.get()
         newXdim = self.boxSize.get()
         correctionFactor = self.inputParticles.get().getXDim() / newXdim
         sr = correctionFactor * self.inputParticles.get().getSamplingRate()
-        args = "--md %s --mask %s --sr %f --lat_dim %d --epochs %d --batch_size %d --output_path %s " \
-               % (md_file, mask_file, sr, latDim, epochs, batch_size, out_path)
+        args = "--md %s --sr %f --lat_dim %d --epochs %d --batch_size %d --learning_rate %s --output_path %s " \
+               % (md_file, sr, latDim, epochs, batch_size, learningRate, out_path)
 
         if self.inputVolume.get():
             args += '--vol %s ' % vol_file
+
+        if self.inputVolumeMask.get():
+            args += '--mask %s ' % mask_file
 
         if self.ctfType != 0:
             if self.ctfType.get() == 1:
@@ -241,7 +281,7 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
             elif self.ctfType.get() == 3:
                 args += '--ctf_type precorrect '
 
-        if self.lazyLoad:
+        if not self.lazyLoad:
             args += '--load_images_to_ram '
 
         if self.massTransport:
@@ -255,17 +295,18 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
             gpu = ''
 
         program = hax.Plugin.getProgram("hetsiren", gpu)
-        self.runJob(program,
-                    args + f'--mode train --reload {self._getExtraPath("HetSIREN")}'
-                    if self.fineTune else args + '--mode train',
-                    numberOfMpi=1)
-        self.runJob(program, args + f'--mode predict --reload {self._getExtraPath("HetSIREN")}', numberOfMpi=1)
+        if not os.path.isdir(self._getExtraPath("HetSIREN")):
+            self.runJob(program,
+                        args + f'--mode train --reload {self._getExtraPath()}'
+                        if self.fineTune else args + '--mode train',
+                        numberOfMpi=1)
+        self.runJob(program, args + f'--mode predict --reload {self._getExtraPath()}', numberOfMpi=1)
 
     def createOutputStep(self):
         inputParticles = self.inputParticles.get()
         out_path_vols = self._getExtraPath('volumes')
         model_path = self._getExtraPath('HetSIREN')
-        md_file = self._getFileName('imgsFn')
+        md_file = self._getFileName('predictedFn')
         out_path = self._getExtraPath()
 
         metadata = XmippMetaData(md_file)
@@ -309,16 +350,22 @@ class JaxProtAngularAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         else:
             gpu = ''
 
-        latents_file_txt = os.path.join(out_path, 'latents.txt')
-        np.savetxt(latents_file_txt, latent_space)
+        # Cluster space
+        latents_kmeans = KMeans(n_clusters=20).fit(latent_space).cluster_centers_
 
-        args = "--latents_file %s --output_path %s" % (latents_file_txt, out_path_vols)
+        latents_file_txt = os.path.join(out_path, 'latents.txt')
+        np.savetxt(latents_file_txt, latents_kmeans)
+
+        if not os.path.isdir(out_path_vols):
+            makePath(out_path_vols)
+
+        args = "--latents_file %s --output_path %s --reload %s" % (latents_file_txt, out_path_vols, self._getExtraPath("HetSIREN"))
         program = hax.Plugin.getProgram("decode_states_from_latents", gpu)
         self.runJob(program, args, numberOfMpi=1)
 
         outVols = self._createSetOfVolumes()
         outVols.setSamplingRate(inputParticles.getSamplingRate())
-        for idx in range(latent_space.shape[0]):
+        for idx in range(latents_kmeans.shape[0]):
             outVol = Volume()
             outVol.setSamplingRate(inputParticles.getSamplingRate())
 

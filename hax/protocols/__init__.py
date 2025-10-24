@@ -26,5 +26,5 @@
 # *
 # **************************************************************************
 
-from .protocol_hetsiren import JaxProtAngularAlignmentHetSiren
+from .protocol_hetsiren import JaxProtFlexibleAlignmentHetSiren
 from .protocol_flexconsensus import JaxProtTrainFlexConsensus
