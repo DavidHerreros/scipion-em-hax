@@ -112,14 +112,14 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
             particle_set = inputSet.get()
 
             progName = particle_set.getFlexInfo().getProgName()
-            data_file = progName + f"_{idx}.txt"
+            data_file = progName + f"_{idx}.npy"
 
             z_flex = []
             for particle in particle_set.iterItems():
                 z_flex.append(particle.getZFlex())
             z_flex = np.vstack(z_flex)
             latent_space = os.path.join(data_path, data_file)
-            np.savetxt(latent_space, z_flex)
+            np.save(latent_space, z_flex)
 
             idx += 1
 
