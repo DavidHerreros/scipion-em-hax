@@ -281,7 +281,7 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
             elif self.ctfType.get() == 3:
                 args += '--ctf_type precorrect '
 
-        if not self.lazyLoad:
+        if self.lazyLoad:
             args += '--load_images_to_ram '
 
         if self.massTransport:

@@ -105,14 +105,14 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
             particle_set = inputSet.get()
 
             progName = particle_set.getFlexInfo().getProgName()
-            data_file = progName + f"_{idx}.txt"
+            data_file = progName + f"_{idx}.npy"
 
             z_flex = []
             for particle in particle_set.iterItems():
                 z_flex.append(particle.getZFlex())
             z_flex = np.vstack(z_flex)
             latent_space = os.path.join(data_path, data_file)
-            np.savetxt(latent_space, z_flex)
+            np.save(latent_space, z_flex)
 
             idx += 1
 
@@ -122,7 +122,10 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
         batch_size = self.batch_size.get()
         epochs = self.epochs.get()
         lat_dim = self.latDim.get()
-        args = "--input_space %s --epochs %d --batch_size %d --output_path %s " % (data_path, epochs, batch_size, out_path)
+        args = "--epochs %d --batch_size %d --output_path %s " % (epochs, batch_size, out_path)
+
+        for file in os.listdir(data_path):
+            args += '--input_space %s ' % os.path.join(data_path, file)
 
         if self.setManual:
             args += '--lat_dim %d ' % lat_dim
