@@ -153,7 +153,7 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
                        help="The learning rate (lr) sets the speed of learning. Think of the model as trying to find the "
                             "lowest point in a valley; the lr is the size of the step it takes on each attempt. A large "
                             "lr (e.g., 0.01) is like taking huge leaps — it's fast but can be unstable, overshoot the "
-                            "lowest point, or cause NAN{ errors. A small lr (e.g., 1e-6) is like taking tiny shuffles — "
+                            "lowest point, or cause NAN errors. A small lr (e.g., 1e-6) is like taking tiny shuffles — "
                             "it's stable but very slow and might get stuck before reaching the bottom. A good default is "
                             "often 0.0001. If training fails or errors explode, try making the lr 10 times smaller (e.g., "
                             "0.001 --> 0.0001).")
