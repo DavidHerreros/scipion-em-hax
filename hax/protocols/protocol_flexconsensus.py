@@ -137,7 +137,7 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
             particle_set = inputSet.get()
 
             progName = particle_set.getFlexInfo().getProgName()
-            input_spaces.append(progName + f"_{idx}:" + os.path.join(data_path, progName + f"_{idx}.txt"))
+            input_spaces.append(progName + f"_{idx}:" + os.path.join(data_path, progName + f"_{idx}.npy"))
 
             idx += 1
 
