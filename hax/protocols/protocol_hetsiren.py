@@ -350,7 +350,6 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         else:
             gpu = ''
 
-        # Cluster space
         latents_kmeans = KMeans(n_clusters=20).fit(latent_space).cluster_centers_
 
         latents_file_txt = os.path.join(out_path, 'latents.txt')

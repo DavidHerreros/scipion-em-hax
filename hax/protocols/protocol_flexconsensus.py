@@ -177,7 +177,7 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
 
             idl = 0
             for particle in inputSet.iterItems():
-                outParticle = ParticleFlex(progName=const.HETSIREN)
+                outParticle = ParticleFlex(progName=const.FLEXCONSENSUS)
                 outParticle.copyInfo(particle)
                 outParticle.setZRed(consensus_space[idl])
                 outParticle.getFlexInfo().setAttr("consensus_error", float(consensus_space_error[idl]))
