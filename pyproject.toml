@@ -7,7 +7,8 @@ name = "scipion-em-hax"
 dynamic = ["version", "dependencies"]
 description = "Plugin to execute Hax package inside Scipion"
 authors = [
-    {name = "David Herreros", email = "dherreros@cnb.csic.es"}
+    {name = "David Herreros", email = "dherreros@cnb.csic.es"},
+    {name = "Eduardo García", email = "eduardo.garcia@cnb.csic.es"}
 ]
 requires-python = ">=3.8"
 readme = "README.md"
@@ -16,7 +17,7 @@ classifiers = [
     #   3 - Alpha
     #   4 - Beta
     #   5 - Production/Stable
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Production/Stable",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
 ]
@@ -34,4 +35,4 @@ dependencies = {file = ["requirements.txt"]}
 "hax" = ["logo.png"]
 
 [project.entry-points."pyworkflow.plugin"]
-cryodrgn = "hax"
+hax = "hax"

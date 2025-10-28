@@ -24,3 +24,6 @@
 # *
 # **************************************************************************
 
+ZERNIKE3D = "Zernike3D"
+HETSIREN = "HetSIREN"
+FLEXCONSENSUS = "FlexConsensus"
