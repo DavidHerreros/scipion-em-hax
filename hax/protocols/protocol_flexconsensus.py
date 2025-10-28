@@ -172,12 +172,16 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
             outputSet.setAlignmentProj()
 
             consensus_space = np.load(self._getExtraPath(progName + f"_{idx}_consensus.npy"))
+            consensus_space_error = np.load(self._getExtraPath(progName + f"_{idx}_consensus_error.npy"))
+            representation_error = np.load(self._getExtraPath(progName + f"_{idx}_representation_error.npy"))
 
             idl = 0
             for particle in inputSet.iterItems():
                 outParticle = ParticleFlex(progName=const.HETSIREN)
                 outParticle.copyInfo(particle)
                 outParticle.setZRed(consensus_space[idl])
+                outParticle.getFlexInfo().setAttr("consensus_error", float(consensus_space_error[idl]))
+                outParticle.getFlexInfo().setAttr("representation_error", float(representation_error[idl]))
                 outputSet.append(outParticle)
                 idl += 1
 
