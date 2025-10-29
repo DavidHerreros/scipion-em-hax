@@ -56,12 +56,12 @@ class Plugin(pwplugin.Plugin):
     @classmethod
     def getAnnotateSpaceFunctionsPath(cls):
         cmd = f'{cls.getCondaActivationCmd()} {cls.getEnvActivation()} && '
-        cmd += "python -c import hax; print(hax.__file__)"
+        cmd += 'python -c "import hax; import os; print(os.path.dirname(hax.__file__))"'
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, shell=True)
         module_path = result.stdout.strip()
 
-        return os.path.join(module_path, "viewers", "annotate_space", "server_loading_functions", "load_model.py")
+        return os.path.join(module_path, "viewers", "server_loading_functions", "load_model.py")
 
     def defineBinaries(cls, env):
         installation_commands = []

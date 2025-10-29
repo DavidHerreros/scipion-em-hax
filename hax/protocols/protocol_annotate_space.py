@@ -31,7 +31,7 @@ import numpy as np
 from glob import glob
 from xmipp_metadata.image_handler import ImageHandler
 
-from pyworkflow import NEW
+from pyworkflow import NEW, VERSION_1
 from pyworkflow.protocol import LEVEL_ADVANCED
 from pyworkflow.protocol.params import PointerParam, IntParam, BooleanParam, StringParam, USE_GPU, GPU_LIST
 import pyworkflow.utils as pwutils
@@ -47,11 +47,12 @@ from hax.utils import getOutputSuffix
 from hax.annotate_space_functions.annotate_space_arguments import getReducedSpaceArguments
 
 
-class ProtFlexAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
+class JaxProtAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
     """ Interactive annotation of conformational spaces """
 
     _label = 'annotate space'
     _devStatus = NEW
+    _lastUpdateVersion = VERSION_1
     OUTPUT_PREFIX = 'flexible3DClasses'
     OUTPUT_PREFIX_CLASSES = 'flexible3DClasses'
     OUTPUT_PREFIX_VOLUMES = 'flexible3DVolumes'
@@ -73,10 +74,6 @@ class ProtFlexAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
                       condition="particles and particles.getFlexInfo().getProgName() == 'CryoDRGN'",
                       help="Volumes generated from the CryoDrgn network will be resampled to the "
                            "chosen box size (only for the visualization).")
-        form.addParam('neighbors', IntParam, label="Number of particles to associate to selections",
-                      default=5000, expertLevel=LEVEL_ADVANCED)
-
-
 
     # --------------------------- INSERT steps functions ----------------------
     def _insertAllSteps(self):
@@ -98,7 +95,7 @@ class ProtFlexAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
         flexSetVols.setSamplingRate(sr)
 
         # Folder with saved volumes and particle indices
-        layers_folder = self._getExtraPath(os.path.join("annotate", "selection_layers"))
+        layers_folder = self._getExtraPath(os.path.join("Intermediate_results", "selection_layers"))
         representative_path = os.path.join(layers_folder, "representative.mrc")
         particle_ids_path = os.path.join(layers_folder, "particle_indices.txt")
 
@@ -185,7 +182,7 @@ class ProtFlexAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
         gpu = ','.join([str(elem) for elem in self.getGpuList()])
 
         # Check if program has a reduced space saved (like in FlexConsensus)
-        if particles.getFirstItem().getZRed() is not None:
+        if particles.getFirstItem().getZRed():
             args += f" {getReducedSpaceArguments(particles, self._getExtraPath())}"
 
         # Program specific arguments
@@ -203,11 +200,10 @@ class ProtFlexAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
             else:
                 args += f" {getAnnotateSpaceArguments(particles)}"
 
-        program = "viewer_interactive_3d.py"
+        program = "annotate_space"
         program = hax.Plugin.getProgram(program, gpu=gpu)
         self.runJob(program, args)
-
-        if len(glob(self._getExtraPath(os.path.join("Intermediate_results", "saved_selections*")))) > 0 and \
+        if len(glob(self._getExtraPath(os.path.join("Intermediate_results", "selections_layers*/")))) > 0 and \
            askYesNo(Message.TITLE_SAVE_OUTPUT, Message.LABEL_SAVE_OUTPUT, None):
             self._createOutput()
 
@@ -243,10 +239,6 @@ class ProtFlexAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
         """ Try to find errors on define params. """
         errors = []
         particles = self.particles.get()
-        if particles.getSize() < self.neighbors.get():
-            errors.append("Number of particles to be associated with each selected state is larger than the "
-                          "total number of particles in the dataset. Please, provide a smaller value "
-                          "(Advanced parameter)")
 
         # Check CryoDRGN boxsize parameter is set as it is mandatory (TODO: Can we set this automatically in each program with custom parameters?)
         if particles.getFlexInfo().getProgName() == 'CryoDRGN':

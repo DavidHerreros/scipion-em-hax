@@ -41,7 +41,7 @@ def getZernike3DArguments(particles):
 def getHetSIRENArguments(particles):
     server_functions_path = Plugin.getAnnotateSpaceFunctionsPath()
 
-    args = f"--server_functions_path {server_functions_path} --pickled_nn {particles.getFlexInfo().getAttr("pickled_nn")}"
+    args = f"--server_functions_path {server_functions_path} --pickled_nn {particles.getFlexInfo().getAttr('modelPath')}"
 
     return args
 
@@ -53,6 +53,6 @@ def getReducedSpaceArguments(particles, save_path):
 
     np.savetxt(os.path.join(save_path, "reduced_space.txt"), consensus_space)
 
-    args = f"--z_space_reduced {consensus_space}"
+    args = f"--z_space_reduced {os.path.join(save_path, 'reduced_space.txt')}"
 
     return args
