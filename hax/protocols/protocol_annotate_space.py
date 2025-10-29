@@ -82,6 +82,7 @@ class JaxProtAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
     def _createOutput(self):
         particles = self.particles.get()
         sr = particles.getSamplingRate()
+        partIds = np.array(list(particles.getIdSet())).astype(int)
         progName = particles.getFlexInfo().getProgName()
 
         # Get FlexHub set creation functions
@@ -94,15 +95,17 @@ class JaxProtAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
         flexSetVols = createFnSet(progName=progName, suffix=suffix)
         flexSetVols.setSamplingRate(sr)
 
-        # Folder with saved volumes and particle indices
-        layers_folder = self._getExtraPath(os.path.join("Intermediate_results", "selection_layers"))
-        representative_path = os.path.join(layers_folder, "representative.mrc")
-        particle_ids_path = os.path.join(layers_folder, "particle_indices.txt")
+        # Folder with saved results
+        layers_folder = self._getExtraPath(os.path.join("Intermediate_results", "selections_layers"))
 
         # Populate set of classes
         clInx = 1
         newId = 1
         for layer_folder in os.listdir(layers_folder):
+            # Folder with saved volumes and particle indices
+            representative_path = os.path.join(layers_folder, layer_folder, "representative.mrc")
+            particle_ids_path = os.path.join(layers_folder, layer_folder, "particle_indices.txt")
+
             if "KMeans" not in layer_folder:
                 newClass = ClassFlex()
                 newClass.copyInfo(particles)
@@ -126,9 +129,9 @@ class JaxProtAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
                 # Populate images
                 enabledClass = flexClasses[newClass.getObjId()]
                 enabledClass.enableAppend()
-                particle_ids = 1 + np.loadtxt(particle_ids_path, dtype=int)
+                particle_ids = partIds[np.loadtxt(particle_ids_path, dtype=int)]
                 for particle_id in particle_ids:
-                    item = particles[particle_id]
+                    item = particles[int(particle_id)]
                     item._xmipp_subtomo_labels = Integer(clInx)
                     item.setObjId(newId)
                     enabledClass.append(item)
