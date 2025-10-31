@@ -185,10 +185,10 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
                 outputSet.append(outParticle)
                 idl += 1
 
-            idx += 1
-
             self._defineOutputs(**{f"outputParticles_{progName}_{idx}": outputSet})
             self._defineTransformRelation(inputSet, outputSet)
+
+            idx += 1
 
         # --------------------------- INFO functions -----------------------------
 
