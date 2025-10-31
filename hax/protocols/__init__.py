@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
 # **************************************************************************
 # *
-# * Authors:     David Herreros Calero (dherreros@cnb.csic.es)
+# * Authors:     David Herreros Calero (dherreros@cnb.csic.es) [1]
+# *              Eduardo García Delgado (eduardo.garcia@cnb.csic.es) [1]
 # *
 # * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
 # *
@@ -24,6 +26,5 @@
 # *
 # **************************************************************************
 
-ZERNIKE3D = "Zernike3D"
-HETSIREN = "HetSIREN"
-FLEXCONSENSUS = "FlexConsensus"
+from .protocol_hetsiren import JaxProtFlexibleAlignmentHetSiren
+from .protocol_flexconsensus import JaxProtTrainFlexConsensus

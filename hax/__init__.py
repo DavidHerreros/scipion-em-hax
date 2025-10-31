@@ -64,21 +64,21 @@ class Plugin(pwplugin.Plugin):
         return os.path.join(module_path, "viewers", "annotate_space", "server_loading_functions", "load_model.py")
 
     def defineBinaries(cls, env):
-        intallation_commands = []
+        installation_commands = []
         conda_activation_command = cls.getCondaActivationCmd()
         
         # Create conda environment
         conda_env_installed = "conda_env_installed"
-        commands_conda_env = f"{conda_activation_command} conda env create -n hax python=3.11 && touch {conda_env_installed}"
-        intallation_commands.append((commands_conda_env, conda_env_installed))
+        commands_conda_env = f"{conda_activation_command} conda create -n hax python=3.10 && touch {conda_env_installed}"
+        installation_commands.append((commands_conda_env, conda_env_installed))
 
         # Install Hax
         hax_installed = "hax_installed"
         hax_pip_package = "git+https://github.com/DavidHerreros/Hax@master"  # TODO: Change this in the future to released package in Pypi
         commands_hax = f"{conda_activation_command} {cls.getEnvActivation()} && pip install {hax_pip_package} && touch {hax_installed}"
-        intallation_commands.append((commands_hax, hax_installed))
+        installation_commands.append((commands_hax, hax_installed))
 
         env.addPackage('hax', version=__version__,
-                       commands=intallation_commands,
+                       commands=installation_commands,
                        tar="void.tgz",
                        default=True)
