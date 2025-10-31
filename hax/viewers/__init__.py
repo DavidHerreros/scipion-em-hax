@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # **************************************************************************
 # *
 # * Authors:     David Herreros Calero (dherreros@cnb.csic.es)
@@ -24,6 +25,5 @@
 # *
 # **************************************************************************
 
-ZERNIKE3D = "Zernike3D"
-HETSIREN = "HetSIREN"
-FLEXCONSENSUS = "FlexConsensus"
+
+from hax.viewers.viewer_tensorboard import JaxTensorboardViewer

@@ -44,10 +44,16 @@ class Plugin(pwplugin.Plugin):
         return "conda activate hax"
 
     @classmethod
-    def getProgram(cls, program, gpu):
+    def getProgram(cls, program, gpu, uses_project_manager=True):
         """ Return the program binary that will be used. """
         cmd = f'{cls.getCondaActivationCmd()} {cls.getEnvActivation()} && '
-        return cmd + f'project_manager --gpu {gpu} {program} '
+        if uses_project_manager:
+            if gpu is not None:
+                return cmd + f'project_manager --gpu {gpu} {program} '
+            else:
+                return cmd + f'project_manager {program} '
+        else:
+            return cmd + f'{program} '
 
     @classmethod
     def getCommand(cls, program, gpu, args):
