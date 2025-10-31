@@ -41,9 +41,10 @@ from pyworkflow.utils import getExt, makePath
 
 from pwem.protocols import ProtAnalysis3D, ProtFlexBase
 from pwem.objects import Volume, ParticleFlex
+from pwem import ALIGN_PROJ
 
 import xmipp3
-from xmipp3.convert import createItemMatrix, setXmippAttributes, writeSetOfParticles, geometryFromMatrix, matrixFromGeometry
+from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 
 import hax
 import hax.constants as const
@@ -308,9 +309,17 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         model_path = self._getExtraPath('HetSIREN')
         md_file = self._getFileName('predictedFn')
         out_path = self._getExtraPath()
+        Xdim = inputParticles.getXDim()
+        self.newXdim = self.boxSize.get()
 
         metadata = XmippMetaData(md_file)
+        correctionFactor = Xdim / self.newXdim
         latent_space = np.asarray([np.fromstring(item, sep=',') for item in metadata[:, 'latent_space']])
+        euler_rot = metadata[:, 'angleRot']
+        euler_tilt = metadata[:, 'angleTilt']
+        euler_psi = metadata[:, 'anglePsi']
+        shift_x = correctionFactor * metadata[:, 'shiftX']
+        shift_y = correctionFactor * metadata[:, 'shiftY']
 
         inputSet = self.inputParticles.get()
         partSet = self._createSetOfParticlesFlex(progName=const.HETSIREN)
@@ -318,12 +327,20 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         partSet.copyInfo(inputSet)
         partSet.setHasCTF(inputSet.hasCTF())
         partSet.setAlignmentProj()
+        inverseTransform = partSet.getAlignment() == ALIGN_PROJ
 
         idx = 0
         for particle in inputSet.iterItems():
             outParticle = ParticleFlex(progName=const.HETSIREN)
             outParticle.copyInfo(particle)
             outParticle.setZFlex(latent_space[idx])
+
+            # Set new transformation matrix
+            tr = matrixFromGeometry(np.array([shift_x[idx], shift_y[idx], 0.0]),
+                                    np.array([euler_rot[idx], euler_tilt[idx], euler_psi[idx]]),
+                                    inverseTransform)
+            outParticle.getTransform().setMatrix(tr)
+
             partSet.append(outParticle)
             idx += 1
 
