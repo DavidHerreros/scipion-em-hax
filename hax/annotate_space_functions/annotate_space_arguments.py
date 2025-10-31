@@ -33,7 +33,7 @@ from hax import Plugin
 def getZernike3DArguments(particles):
     server_functions_path = Plugin.getAnnotateSpaceFunctionsPath()
 
-    args = f"--server_functions_path {server_functions_path}"
+    args = f"--server_functions_path {server_functions_path} --env_name hax"
 
     return args
 
@@ -41,7 +41,8 @@ def getZernike3DArguments(particles):
 def getHetSIRENArguments(particles):
     server_functions_path = Plugin.getAnnotateSpaceFunctionsPath()
 
-    args = f"--server_functions_path {server_functions_path} --pickled_nn {particles.getFlexInfo().getAttr('modelPath')}"
+    args = (f"--server_functions_path {server_functions_path} --pickled_nn {particles.getFlexInfo().getAttr('modelPath')} "
+            f"--env_name hax")
 
     return args
 
