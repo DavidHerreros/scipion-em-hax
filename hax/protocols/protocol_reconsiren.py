@@ -110,6 +110,12 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
                        condition='inputParticles and inputParticles.hasAlignmentProj',
                        label="Refine current particle alignments?")
 
+        group.addParam('refineVolume', params.BooleanParam, default=True,
+                       condition='inputVolume',
+                       label="Refine current volume?",
+                       help="When this parameter is provided, ReconSIREN will just learn an angular assignment with shifts without learning any map. This is usually useful when a reference volume with "
+                            "high resolution is provided (e.g. coming from an atomic model) and no refinement of the map is needed.")
+
         group = form.addGroup("Symmetry")
         group.addParam('symmetry', params.StringParam, default="c1", label='Symmetry group',
                        help="If your protein has any kind of symmetry, you may pass it here so that it is considered while learning the angular assignment "
@@ -248,6 +254,9 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
 
         if self.refineCurrent.get():
             args += '--refine_current_assignment '
+
+        if not self.refineVolume.get():
+            args += "--do_not_learn_volume "
 
         if self.ctfType != 0:
             if self.ctfType.get() == 1:
