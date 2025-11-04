@@ -24,6 +24,36 @@
 # *
 # **************************************************************************
 
-ZERNIKE3D = "Zernike3D"
-HETSIREN = "HetSIREN"
-FLEXCONSENSUS = "FlexConsensus"
+
+import os
+import numpy as np
+
+from hax import Plugin
+
+def getZernike3DArguments(particles):
+    server_functions_path = Plugin.getAnnotateSpaceFunctionsPath()
+
+    args = f"--server_functions_path {server_functions_path} --env_name hax"
+
+    return args
+
+
+def getHetSIRENArguments(particles):
+    server_functions_path = Plugin.getAnnotateSpaceFunctionsPath()
+
+    args = (f"--server_functions_path {server_functions_path} --pickled_nn {particles.getFlexInfo().getAttr('modelPath')} "
+            f"--env_name hax")
+
+    return args
+
+def getReducedSpaceArguments(particles, save_path):
+    consensus_space = []
+    for particle in particles.iterItems():
+        consensus_space.append(particle.getZRed())
+    consensus_space = np.asarray(consensus_space)
+
+    np.savetxt(os.path.join(save_path, "reduced_space.txt"), consensus_space)
+
+    args = f"--z_space_reduced {os.path.join(save_path, 'reduced_space.txt')}"
+
+    return args

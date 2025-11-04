@@ -24,6 +24,20 @@
 # *
 # **************************************************************************
 
-ZERNIKE3D = "Zernike3D"
-HETSIREN = "HetSIREN"
-FLEXCONSENSUS = "FlexConsensus"
+
+def getOutputSuffix(protocol, cls):
+    """ Get the name to be used for a new output.
+    For example: output3DCoordinates7.
+    It should take into account previous outputs
+    and number with a higher value.
+    """
+    maxCounter = -1
+    for attrName, _ in protocol.iterOutputAttributes(cls):
+        suffix = attrName.replace(protocol.OUTPUT_PREFIX, '')
+        try:
+            counter = int(suffix)
+        except:
+            counter = 1  # when there is not number assume 1
+        maxCounter = max(counter, maxCounter)
+
+    return str(maxCounter + 1) if maxCounter > 0 else '1'  # empty if not output

@@ -28,3 +28,4 @@
 
 from .protocol_hetsiren import JaxProtFlexibleAlignmentHetSiren
 from .protocol_flexconsensus import JaxProtTrainFlexConsensus
+from .protocol_annotate_space import JaxProtAnnotateSpace
