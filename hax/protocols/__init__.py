@@ -29,3 +29,5 @@
 from .protocol_hetsiren import JaxProtFlexibleAlignmentHetSiren
 from .protocol_flexconsensus import JaxProtTrainFlexConsensus
 from .protocol_annotate_space import JaxProtAnnotateSpace
+from .protocol_predict_hetsiren import JaxProtPredictHetSiren
+from .protocol_interactive_consensus import JaxProtInteractiveFlexConsensus

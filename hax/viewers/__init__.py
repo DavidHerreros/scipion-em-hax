@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # **************************************************************************
 # *
-# * Authors:     David Herreros Calero (dherreros@cnb.csic.es)
+# * Authors:     David Herreros Calero (dherreros@cnb.csic.es) [1]
+# *              Eduardo García Delgado (eduardo.garcia@cnb.csic.es) [1]
 # *
 # * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
 # *
@@ -25,5 +26,5 @@
 # *
 # **************************************************************************
 
-
+from hax.viewers.viewer_interactive_consensus import JaxFlexConsensusView
 from hax.viewers.viewer_tensorboard import JaxTensorboardViewer
