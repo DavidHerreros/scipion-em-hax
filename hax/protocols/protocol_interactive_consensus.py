@@ -100,13 +100,12 @@ class JaxProtInteractiveFlexConsensus(ProtAnalysis3D, ProtFlexBase):
 
     def predictStep(self):
         data_path = self._getFlexConsensusProtocol()._getExtraPath("data")
-        out_path = self._getFlexConsensusProtocol()._getExtraPath()
         batch_size = self.batchSize.get()
         particles = self.inputSet.get()
         progName = particles.getFlexInfo().getProgName()
         input_space = progName + f"_{1}:" + os.path.join(data_path, progName + f"_{1}.npy")
 
-        args = ("--input_space %s --batch_size %d --output_path %s " % (input_space, batch_size, out_path))
+        args = ("--input_space %s --batch_size %d --output_path %s " % (input_space, batch_size, self._getExtraPath()))
 
         if self._getFlexConsensusProtocol().setManual:
             lat_dim = self._getFlexConsensusProtocol().latDim.get()
@@ -118,7 +117,7 @@ class JaxProtInteractiveFlexConsensus(ProtAnalysis3D, ProtFlexBase):
             gpu = ''
 
         program = hax.Plugin.getProgram("flexconsensus", gpu)
-        self.runJob(program, args + f'--mode predict --reload {out_path}', numberOfMpi=1)
+        self.runJob(program, args + f'--mode predict --reload {self._getFlexConsensusProtocol()._getExtraPath()}', numberOfMpi=1)
 
     def _createOutput(self):
         inputSet = self.inputSet.get()

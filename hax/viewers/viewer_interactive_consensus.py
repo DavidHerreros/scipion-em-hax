@@ -62,10 +62,12 @@ class JaxFlexConsensusView(ProtocolViewer):
     # ------------------- Interactive histogram method -------------------
     def _doShowHist(self, param=None):
         if self.chosen == self._choices[0]:
-            file = [f for f in os.listdir(self.protocol._getExtraPath()) if f.endswith('consensus_error')]
+            file = [f for f in os.listdir(self.protocol._getExtraPath()) if f.endswith('consensus_error.npy')][0]
+            print(file)
             data = np.load(self.protocol._getExtraPath(file))
         elif self.chosen == self._choices[1]:
-            file = [f for f in os.listdir(self.protocol._getExtraPath()) if f.endswith('representation_error')]
+            file = [f for f in os.listdir(self.protocol._getExtraPath()) if f.endswith('representation_error.npy')][0]
+            print(file)
             data = np.load(self.protocol._getExtraPath(file))
 
         hist = InteractiveHist(data, self.protocol)
