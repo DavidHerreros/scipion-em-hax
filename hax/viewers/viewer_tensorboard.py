@@ -29,7 +29,8 @@ import os
 from glob import glob
 import time
 import subprocess
-import signal
+import multiprocessing as mp
+import psutil
 import socket
 import webbrowser
 from contextlib import closing
@@ -39,7 +40,7 @@ from pyworkflow.gui.dialog import showError
 
 from pwem.viewers import DataViewer
 
-from hax.protocols import JaxProtFlexibleAlignmentHetSiren, JaxProtTrainFlexConsensus
+from hax.protocols import JaxProtFlexibleAlignmentHetSiren, JaxProtTrainFlexConsensus, JaxProtAngularAlignmentReconSiren
 
 import hax
 
@@ -48,7 +49,8 @@ class JaxTensorboardViewer(DataViewer):
     """ Tensorboard visualization of neural networks """
     _label = 'viewer Tensorboard'
     _targets = [JaxProtFlexibleAlignmentHetSiren,
-                JaxProtTrainFlexConsensus]
+                JaxProtTrainFlexConsensus,
+                JaxProtAngularAlignmentReconSiren]
     _environments = [DESKTOP_TKINTER, WEB_DJANGO]
 
     def __init__(self, **kwargs):
@@ -63,22 +65,52 @@ class JaxTensorboardViewer(DataViewer):
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     return s.connect_ex(('localhost', port)) == 0
 
+            # Find free port
             with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
                 s.bind(('', 0))
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 port = s.getsockname()[1]
+
+            # Launch TensorBoard
             program = hax.Plugin.getProgram("tensorboard", gpu=None, uses_project_manager=False)
             args = f" --logdir {logdir_path} --port {port}"
             self.tensorboard_process = subprocess.Popen(program + args, shell=True)
-
             while not is_port_in_use(port):
                 time.sleep(0.1)
 
-            # Web engine to render plot
-            webbrowser.open_new(f"http://localhost:{port}/")
+            url = f"http://localhost:{port}/"
+            print(f"TensorBoard running at {url}")
 
-            # time.sleep(1.)
-            # os.killpg(os.getpgid(self.tensorboard_process.pid), signal.SIGTERM)
+            # Use webbrowser.get() to obtain command
+            try:
+                browser_controller = webbrowser.get()  # get default browser
+                browser_cmd = browser_controller.name
+            except webbrowser.Error:
+                browser_cmd = None
+
+            # Launch the browser manually if we can
+            if browser_cmd:
+                browser_proc = subprocess.Popen([browser_cmd, url])
+                print(f"Opened {browser_cmd} for TensorBoard view")
+            else:
+                webbrowser.open_new(url)
+                browser_proc = None
+                print("Opened browser via webbrowser, but cannot track its closure")
+
+            # Wait for browser to close
+            if browser_proc:
+                browser_proc.wait()
+                print("Browser closed — stopping TensorBoard...")
+            else:
+                print("Cannot detect browser closure — press Ctrl+C to stop TensorBoard manually.")
+
+            # Stop TensorBoard
+            parent = psutil.Process(self.tensorboard_process.pid)
+            for child in parent.children(recursive=True):
+                child.kill()
+            self.tensorboard_process.terminate()
+            self.tensorboard_process.wait()
+            print("TensorBoard stopped.")
 
         if not os.path.isdir(logdir_path):
             if hasattr(self.protocol, "tensorboard"):
@@ -92,6 +124,7 @@ class JaxTensorboardViewer(DataViewer):
             showError(title="Tensorboard log files not found", msg=msg, parent=self.getTkRoot())
             return []
 
-        launchTensorboard(logdir_path)
+        p = mp.Process(target=launchTensorboard, args=(logdir_path,), daemon=True)
+        p.start()
 
         return []
