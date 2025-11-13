@@ -1,8 +1,9 @@
 # **************************************************************************
 # *
-# * Authors:     David Herreros Calero (dherreos@cnb.csic.es)
+# * Authors:     Eduardo García Delgado (eduardo.garcia@cnb.csic.es) [1]
+# *              David Herreros Calero (dherreos@cnb.csic.es) [1]
 # *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC [1]
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -24,36 +25,33 @@
 # *
 # **************************************************************************
 
-
 import os
-import re
-from glob import glob
-
 import numpy as np
+from sklearn.cluster import KMeans
+
 from xmipp_metadata.metadata import XmippMetaData
 from xmipp_metadata.image_handler import ImageHandler
 
 import pyworkflow.protocol.params as params
-from pyworkflow.object import String, Boolean, Float
+from pyworkflow.object import String
 from pyworkflow.utils.path import moveFile
-from pyworkflow import VERSION_2_0
+from pyworkflow import VERSION_1
+from pyworkflow.utils import getExt, makePath
 
-from pwem.protocols import ProtAnalysis3D
-import pwem.emlib.metadata as md
-from pwem.constants import ALIGN_PROJ, ALIGN_NONE
+from pwem.protocols import ProtAnalysis3D, ProtFlexBase
 from pwem.objects import Volume, Particle
+from pwem import ALIGN_PROJ
 
-from xmipp3.convert import createItemMatrix, setXmippAttributes, writeSetOfParticles, \
-    geometryFromMatrix, matrixFromGeometry
 import xmipp3
+from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 
 import hax
+import hax.constants as const
 
-
-class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
-    """ Ab initio reconstruction and global assignation with ReconSIREN neural network."""
-    _label = 'angular align - ReconSIREN'
-    _lastUpdateVersion = VERSION_2_0
+class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
+    """ Protocol for image gray values adjustment with the Image Gray Scale Adjustment algorithm."""
+    _label = 'predict - Image Adjustment '
+    _lastUpdateVersion = VERSION_1
 
     # --------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
@@ -61,7 +59,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         form.addHidden(params.USE_GPU, params.BooleanParam, default=True,
                        label="Use GPU for execution",
                        help="This protocol has both CPU and GPU implementation.\
-                             Select the one you want to use.")
+                                 Select the one you want to use.")
 
         form.addHidden(params.GPU_LIST, params.StringParam, default='0',
                        expertLevel=params.LEVEL_ADVANCED,
@@ -70,28 +68,19 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
 
         group = form.addGroup("Data")
         group.addParam('inputParticles', params.PointerParam, label="Input particles", pointerClass='SetOfParticles',
-                       important=True,
-                       help="If your particles do not have alignment information, ReconSIREN will learn the pose and in plane shifts "
-                            "from scratch. Otherwise, the current alignment of the particles will be refined.")
+                       important=True)
 
-        group.addParam('inputVolume', params.PointerParam, allowsNull=True,
+        group.addParam('inputVolume', params.PointerParam,
                        label="Starting volume", pointerClass='Volume',
-                       help="If not provided, ReconSIREN will learn from scratch the initial volume form the images. If a "
-                            "volume is provided, ReconSIREN will perform a refinement of the volume as it improves the angles.")
+                       help="Reference volume needed to generate the projections to be adjusted. If adjustment prediction setting "
+                            "is set to True, these projections will be needed for its estimation.")
 
         group.addParam('inputVolumeMask', params.PointerParam,
                        label="Reconstruction mask", pointerClass='VolumeMask', allowsNull=True,
-                       help="ReconSIREN will use the values within the provided mask to determine the mass available to be used "
-                            "to reconstruct/refine the initial volume (NOTE: masks provided here MUST be BINARY):\n\n"
-                            "If no volume is provided\n"
-                            "In this case, we recommend providing a circular mask with enough mass to reconstruct the protein captured in the "
-                            "input images. As a rule of thumb, we recommend a circular mask with radius 0.25 * box_length unless your protein "
-                            "is embedded in a membrane or nano-disc. In this case, we recommend a circular mask with radius 0.5 * box_length\n\n"
-                            "If a volume is provided\n"
-                            "If you have provided an input volume, we recommend a mask generated by thresholding the input volume. You may also dilate "
-                            "the mask to give ReconSIREN additional mass and increase its accuracy.")
+                       help="This mask helps focusing the adjustment prediction on a region of interest "
+                            "(if not provided, a inscribed spherical mask will be used).")
 
-        group.addParam('boxSize', params.IntParam, default=64,
+        group.addParam('boxSize', params.IntParam, default=128,
                        label='Downsample particles to this box size',
                        help='If your GPU is not able to fit your particles in memory, you can play with this parameter to downsample your images. '
                             'In this way, you will be able to fit your particles at the expense of losing resolution in the volumes generated by the '
@@ -106,27 +95,13 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
                             "* *Wiener*: input particle is CTF corrected by a Wiener fiter\n"
                             "* *Precorrect: similar to Wiener but CTF has already been corrected")
 
-        group.addParam('refineCurrent', params.BooleanParam, default=False,
-                       condition='inputParticles and inputParticles.hasAlignmentProj',
-                       label="Refine current particle alignments?")
-
-        group.addParam('refineVolume', params.BooleanParam, default=True,
-                       condition='inputVolume',
-                       label="Refine current volume?",
-                       help="When this parameter is provided, ReconSIREN will just learn an angular assignment with shifts without learning any map. This is usually useful when a reference volume with "
-                            "high resolution is provided (e.g. coming from an atomic model) and no refinement of the map is needed.")
-
-        group = form.addGroup("Symmetry")
-        group.addParam('symmetry', params.StringParam, default="c1", label='Symmetry group',
-                       help="If your protein has any kind of symmetry, you may pass it here so that it is considered while learning the angular assignment "
-                            "and the volume (NOTE: only c* and d* symmetry groups are currently supported - the parameter is lower case sensitive - even if "
-                            "symmetry is provided, the network will learn a symmetry broken set of angles in c1. Therefore, the angles can be directly used "
-                            "in a reconstruction/refinement.)")
-
         form.addSection(label='Network')
         form.addParam('fineTune', params.BooleanParam, default=False, label='Fine tune previous network?',
-                      help='When set to Yes, you will be able to provide a previously trained ReconSIREN network to refine it with new '
-                           'data. If set to No, you will train a new ReconSIREN network from scratch.')
+                      help='When set to Yes, you will be able to provide a previously trained network to refine it with new '
+                           'data. If set to No, you will train a new network from scratch.')
+
+        form.addParam('predictValue', params.BooleanParam, default=True, label='Adjustment prediction',
+                      help='If not provided, the adjustment will be estimated per pixel - otherwise, adjustment will be estimated per projection.')
 
         form.addParam('lazyLoad', params.BooleanParam, default=False,
                       expertLevel=params.LEVEL_ADVANCED, label='Lazy loading into RAM',
@@ -138,13 +113,17 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
                            'once the execution has finished.')
 
         group = form.addGroup("Network hyperparameters")
+        group.addParam('latDim', params.IntParam, default=10, label='Latent space dimension',
+                       expertLevel=params.LEVEL_ADVANCED,
+                       help="Dimension of the network bottleneck (latent space dimension)")
+
         group.addParam('epochs', params.IntParam, default=50,
                        label='Number of training epochs',
                        help="Number of epochs to train the network (i.e. how many times to loop over the whole dataset "
                             "of images - set to default to 50 - as a rule of thumb, consider 50 to 100 epochs enough "
                             "for 100k images / if your dataset is bigger or smaller, scale this value proportionally to it")
 
-        group.addParam('batchSize', params.IntParam, default=64, label='Number of images in batch',
+        group.addParam('batchSize', params.IntParam, default=8, label='Number of images in batch',
                        help="Determines how many images will be load in the GPU at any moment during training (set by "
                             "default to 8 - you can control GPU memory usage easily by tuning this parameter to fit your "
                             "hardware requirements - we recommend using tools like nvidia-smi to monitor and/or measure "
@@ -159,17 +138,16 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
                             "it's stable but very slow and might get stuck before reaching the bottom. A good default is "
                             "often 0.0001. If training fails or errors explode, try making the lr 10 times smaller (e.g., "
                             "0.001 --> 0.0001).")
-        form.addParallelSection(threads=4, mpi=0)
+
+        form.addParallelSection(threads=0, mpi=4)
 
     def _createFilenameTemplates(self):
         """ Centralize how files are called """
         myDict = {
             'imgsFn': self._getExtraPath('input_particles.xmd'),
-            'predictedFn': self._getExtraPath('predicted_pose_shifts.xmd'),
+            'predictedFn': self._getExtraPath('predicted_latents.xmd'),
             'fnVol': self._getExtraPath('volume.mrc'),
             'fnVolMask': self._getExtraPath('mask.mrc'),
-            'fnOutDir': self._getExtraPath(),
-            'fnSymMatrices': self._getExtraPath("sym_matrices.npy")
         }
         self._updateFilenamesDict(myDict)
 
@@ -180,7 +158,6 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         self._insertFunctionStep(self.trainingPredictStep)
         self._insertFunctionStep(self.createOutputStep)
 
-    # --------------------------- STEPS functions -----------------------
     def writeMetaDataStep(self):
         imgsFn = self._getFileName('imgsFn')
         fnVol = self._getFileName('fnVol')
@@ -191,16 +168,15 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         newXdim = self.boxSize.get()
         vol_mask_dim = newXdim
 
-        if self.inputVolume.get():
-            ih = ImageHandler()
-            inputVolume = self.inputVolume.get().getFileName()
-            ih.convert(self._getXmippFileName(inputVolume), fnVol)
-            curr_vol_dim = ImageHandler(self._getXmippFileName(inputVolume)).getDimensions()[-1]
-            if curr_vol_dim != vol_mask_dim:
-                self.runJob("xmipp_image_resize",
-                            "-i %s --fourier %d " % (fnVol, vol_mask_dim), numberOfMpi=1,
-                            env=xmipp3.Plugin.getEnviron())
-            ih.setSamplingRate(fnVol, inputParticles.getSamplingRate())
+        ih = ImageHandler()
+        inputVolume = self.inputVolume.get().getFileName()
+        ih.convert(self._getXmippFileName(inputVolume), fnVol)
+        curr_vol_dim = ImageHandler(self._getXmippFileName(inputVolume)).getDimensions()[-1]
+        if curr_vol_dim != vol_mask_dim:
+            self.runJob("xmipp_image_resize",
+                        "-i %s --fourier %d " % (fnVol, vol_mask_dim), numberOfMpi=1,
+                        env=xmipp3.Plugin.getEnviron())
+        ih.setSamplingRate(fnVol, inputParticles.getSamplingRate())
 
         if self.inputVolumeMask.get():
             ih = ImageHandler()
@@ -216,6 +192,13 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
             ImageHandler().createCircularMask(fnVolMask, boxSize=vol_mask_dim, is3D=True)
 
         writeSetOfParticles(inputParticles, imgsFn)
+
+        # Write extra attributes (if needed)
+        md = XmippMetaData(imgsFn)
+        if hasattr(inputParticles.getFirstItem(), "_xmipp_subtomo_labels"):
+            labels = np.asarray([int(particle._xmipp_subtomo_labels) for particle in inputParticles.iterItems()])
+            md[:, "subtomo_labels"] = labels
+        md.write(imgsFn, overwrite=True)
 
         if newXdim != Xdim:
             params = "-i %s -o %s --save_metadata_stack %s --fourier %d" % \
@@ -236,27 +219,18 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         out_path = self._getExtraPath()
         if not os.path.isdir(out_path):
             os.mkdir(out_path)
-        symmetry = self.symmetry.get()
         batch_size = self.batchSize.get()
         learningRate = self.learningRate.get()
         epochs = self.epochs.get()
+        latDim = self.latDim.get()
         newXdim = self.boxSize.get()
         correctionFactor = self.inputParticles.get().getXDim() / newXdim
         sr = correctionFactor * self.inputParticles.get().getSamplingRate()
-        args = "--md %s --sr %f --epochs %d --batch_size %d --learning_rate %s --output_path %s --symmetry_group %s " \
-               % (md_file, sr, epochs, batch_size, learningRate, out_path, symmetry)
-
-        if self.inputVolume.get():
-            args += '--vol %s ' % vol_file
+        args = "--md %s --vol %s --sr %f --lat_dim %d --epochs %d --batch_size %d --learning_rate %s --output_path %s " \
+               % (md_file, vol_file, sr, latDim, epochs, batch_size, learningRate, out_path)
 
         if self.inputVolumeMask.get():
             args += '--mask %s ' % mask_file
-
-        if self.refineCurrent.get():
-            args += '--refine_current_assignment '
-
-        if not self.refineVolume.get():
-            args += "--do_not_learn_volume "
 
         if self.ctfType != 0:
             if self.ctfType.get() == 1:
@@ -268,6 +242,9 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         else:
             args += '--ctf_type None '
 
+        if self.predictValue:
+            args += '--predict_value '
+
         if self.lazyLoad:
             args += '--load_images_to_ram '
 
@@ -276,8 +253,8 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         else:
             gpu = ''
 
-        program = hax.Plugin.getProgram("reconsiren", gpu)
-        if not os.path.isdir(self._getExtraPath("ReconSIREN")):
+        program = hax.Plugin.getProgram("image_gray_scale_adjustment", gpu)
+        if not os.path.isdir(self._getExtraPath("imageAdjustment")):
             self.runJob(program,
                         args + f'--mode train --reload {self._getExtraPath()}'
                         if self.fineTune else args + '--mode train',
@@ -285,60 +262,30 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         self.runJob(program, args + f'--mode predict --reload {self._getExtraPath()}', numberOfMpi=1)
 
     def createOutputStep(self):
-        out_path_vol = self._getExtraPath('reconsiren_map.mrc')
-        md_file = self._getFileName('predictedFn')
-        Xdim = self.inputParticles.getXDim()
-        self.newXdim = self.boxSize.get()
-
-        metadata = XmippMetaData(md_file)
-        correctionFactor = Xdim / self.newXdim
-        euler_rot = metadata[:, 'angleRot']
-        euler_tilt = metadata[:, 'angleTilt']
-        euler_psi = metadata[:, 'anglePsi']
-        shift_x = correctionFactor * metadata[:, 'shiftX']
-        shift_y = correctionFactor * metadata[:, 'shiftY']
-
         inputSet = self.inputParticles.get()
         partSet = self._createSetOfParticles()
+        out_path = os.path.join(self._getExtraPath(), "adjusted_images.mrcs")
+
+        md_file = self._getFileName('imgsFn')
+        md = XmippMetaData(md_file)
 
         partSet.copyInfo(inputSet)
         partSet.setHasCTF(inputSet.hasCTF())
         partSet.setAlignmentProj()
-        inverseTransform = partSet.getAlignment() == ALIGN_PROJ
 
         idx = 0
         for particle in inputSet.iterItems():
             outParticle = Particle()
             outParticle.copyInfo(particle)
 
-            # Set new transformation matrix
-            tr = matrixFromGeometry(np.array([shift_x[idx], shift_y[idx], 0.0]),
-                                    np.array([euler_rot[idx], euler_tilt[idx], euler_psi[idx]]),
-                                    inverseTransform)
-            outParticle.getTransform().setMatrix(tr)
+            image_id, _ = md[idx, "image"].split('@')
+            outParticle.setLocation("@".join([image_id, out_path]))
 
             partSet.append(outParticle)
             idx += 1
 
-        outVols = self._createSetOfVolumes()
-        outVols.setSamplingRate(inputSet.getSamplingRate())
-        outVol = Volume()
-        outVol.setSamplingRate(inputSet.getSamplingRate())
-
-        ImageHandler().scaleSplines(out_path_vol, out_path_vol, finalDimension=inputSet.getXDim(), overwrite=True)
-        ImageHandler().setSamplingRate(out_path_vol, inputSet.getSamplingRate())
-
-        outVol.setLocation(out_path_vol)
-        outVols.append(outVol)
-
         self._defineOutputs(outputParticles=partSet)
         self._defineTransformRelation(inputSet, partSet)
-
-        self._defineOutputs(outputVolumes=outVols)
-        self._defineTransformRelation(inputSet, outVols)
-
-
-    # --------------------------- UTILS functions -----------------------
 
     # --------------------------- INFO functions -----------------------------
     def _summary(self):
@@ -352,14 +299,38 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         return summary
 
     # ----------------------- VALIDATE functions -----------------------
-    def validate(self):
+    def _validate(self):
         """ Try to find errors on define params. """
         errors = []
 
+        particles = self.inputParticles.get()
+        batch_size = self.batchSize.get()
+
+        vol = self.inputVolume.get()
         mask = self.inputVolumeMask.get()
+
+        if len(particles) % batch_size != 0:
+            errors.append("Input batch size has to change so that the number of input particles "
+                          "is divisible by the input batch size")
+
+        if vol is None:
+            errors.append("A volume is required. Please, select a valid and adecuate volume for your dataset")
+
         if mask is not None:
             data = ImageHandler(mask.getFileName()).getData()
             if not np.all(np.logical_and(data >= 0, data <= 1)):
                 errors.append("Mask provided is not binary. Please, provide a binary mask")
 
         return errors
+
+    def _warnings(self):
+        warnings = []
+
+        return warnings
+
+    # --------------------------- UTILS functions -----------------------
+
+    def _getXmippFileName(self, filename):
+        if getExt(filename) == ".mrc":
+            filename += ":mrc"
+        return filename
