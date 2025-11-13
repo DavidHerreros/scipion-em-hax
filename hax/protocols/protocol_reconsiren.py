@@ -285,7 +285,6 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         self.runJob(program, args + f'--mode predict --reload {self._getExtraPath()}', numberOfMpi=1)
 
     def createOutputStep(self):
-        inputParticles = self.inputParticles.get()
         out_path_vol = self._getExtraPath('reconsiren_map.mrc')
         md_file = self._getFileName('predictedFn')
         Xdim = inputParticles.getXDim()
@@ -322,21 +321,21 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
             idx += 1
 
         outVols = self._createSetOfVolumes()
-        outVols.setSamplingRate(inputParticles.getSamplingRate())
+        outVols.setSamplingRate(inputSet.getSamplingRate())
         outVol = Volume()
-        outVol.setSamplingRate(inputParticles.getSamplingRate())
+        outVol.setSamplingRate(inputSet.getSamplingRate())
 
-        ImageHandler().scaleSplines(out_path_vol, out_path_vol, finalDimension=inputParticles.getXDim(), overwrite=True)
-        ImageHandler().setSamplingRate(out_path_vol, inputParticles.getSamplingRate())
+        ImageHandler().scaleSplines(out_path_vol, out_path_vol, finalDimension=inputSet.getXDim(), overwrite=True)
+        ImageHandler().setSamplingRate(out_path_vol, inputSet.getSamplingRate())
 
         outVol.setLocation(out_path_vol)
         outVols.append(outVol)
 
         self._defineOutputs(outputParticles=partSet)
-        self._defineTransformRelation(inputParticles, partSet)
+        self._defineTransformRelation(inputSet, partSet)
 
         self._defineOutputs(outputVolumes=outVols)
-        self._defineTransformRelation(inputParticles, outVols)
+        self._defineTransformRelation(inputSet, outVols)
 
 
     # --------------------------- UTILS functions -----------------------
