@@ -48,9 +48,9 @@ from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 import hax
 import hax.constants as const
 
-class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol for image gray values adjustment with the Image Gray Scale Adjustment algorithm."""
-    _label = 'predict - Image Adjustment '
+class JaxProtVolumeAdjustment(ProtAnalysis3D, ProtFlexBase):
+    """ Protocol for volume gray values adjustment with the Volume Gray Scale Adjustment algorithm."""
+    _label = 'predict - Volume Adjustment '
     _lastUpdateVersion = VERSION_1
 
     # --------------------------- DEFINE param functions -----------------------
@@ -72,7 +72,7 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
 
         group.addParam('inputVolume', params.PointerParam,
                        label="Starting volume", pointerClass='Volume',
-                       help="Reference volume needed to generate the projections to be adjusted. If adjustment prediction setting "
+                       help="Reference volume needed to be adjusted according to the projections. If adjustment prediction setting "
                             "is set to True, these projections will be needed for its estimation.")
 
         group.addParam('inputVolumeMask', params.PointerParam,
@@ -100,8 +100,8 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
                       help='When set to Yes, you will be able to provide a previously trained network to refine it with new '
                            'data. If set to No, you will train a new network from scratch.')
 
-        form.addParam('predictValue', params.BooleanParam, default=True, label='Adjustment prediction',
-                      help='If not provided, the adjustment will be estimated per pixel - otherwise, adjustment will be estimated per projection.')
+        form.addParam('predictsValue', params.BooleanParam, default=True, label='Adjustment prediction',
+                      help='If not provided, the adjustment will be estimated per voxel - otherwise, adjustment will be estimated for the whole volume.')
 
         form.addParam('lazyLoad', params.BooleanParam, default=False,
                       expertLevel=params.LEVEL_ADVANCED, label='Lazy loading into RAM',
@@ -226,8 +226,8 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
         newXdim = self.boxSize.get()
         correctionFactor = self.inputParticles.get().getXDim() / newXdim
         sr = correctionFactor * self.inputParticles.get().getSamplingRate()
-        args = "--md %s --vol %s --sr %f --lat_dim %d --batch_size %d --output_path %s " \
-               % (md_file, vol_file, sr, latDim, batch_size, out_path)
+        args = "--md %s --vol %s --sr %f --lat_dim %d --output_path %s " \
+               % (md_file, vol_file, sr, latDim, out_path)
 
         if self.inputVolumeMask.get():
             args += '--mask %s ' % mask_file
@@ -242,8 +242,8 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
         else:
             args += '--ctf_type None '
 
-        if self.predictValue:
-            args += '--predict_value '
+        if self.predictsValue:
+            args += '--predicts_value '
 
         if self.lazyLoad:
             args += '--load_images_to_ram '
@@ -253,39 +253,24 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
         else:
             gpu = ''
 
-        program = hax.Plugin.getProgram("image_gray_scale_adjustment", gpu)
-        if not os.path.isdir(self._getExtraPath("imageAdjustment")):
+        program = hax.Plugin.getProgram("volume_gray_scale_adjustment", gpu)
+        if not os.path.isdir(self._getExtraPath("volumeAdjustment")):
             self.runJob(program,
-                        args + f'--mode train --epochs {epochs} --learning_rate {learningRate} --reload {self._getExtraPath()}'
+                        args + f'--mode train --epochs {epochs} --batch_size {batch_size} --learning_rate {learningRate} --reload {self._getExtraPath()}'
                         if self.fineTune else args + '--mode train',
                         numberOfMpi=1)
         self.runJob(program, args + f'--mode predict --reload {self._getExtraPath()}', numberOfMpi=1)
 
     def createOutputStep(self):
         inputSet = self.inputParticles.get()
-        partSet = self._createSetOfParticles()
-        out_path = os.path.join(self._getExtraPath(), "adjusted_images.mrcs")
+        out_path = os.path.join(self._getExtraPath(), "volume_adjusted.mrc")
 
-        md_file = self._getFileName('imgsFn')
-        md = XmippMetaData(md_file)
+        outVol = Volume()
+        outVol.setSamplingRate(inputSet.getSamplingRate())
+        outVol.setLocation(out_path)
 
-        partSet.copyInfo(inputSet)
-        partSet.setHasCTF(inputSet.hasCTF())
-        partSet.setAlignmentProj()
-
-        idx = 0
-        for particle in inputSet.iterItems():
-            outParticle = Particle()
-            outParticle.copyInfo(particle)
-
-            image_id, _ = md[idx, "image"].split('@')
-            outParticle.setLocation("@".join([image_id, out_path]))
-
-            partSet.append(outParticle)
-            idx += 1
-
-        self._defineOutputs(outputParticles=partSet)
-        self._defineTransformRelation(inputSet, partSet)
+        self._defineOutputs(outputVolume=outVol)
+        self._defineTransformRelation(inputSet, outVol)
 
     # --------------------------- INFO functions -----------------------------
     def _summary(self):
@@ -303,15 +288,8 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
         """ Try to find errors on define params. """
         errors = []
 
-        particles = self.inputParticles.get()
-        batch_size = self.batchSize.get()
-
         vol = self.inputVolume.get()
         mask = self.inputVolumeMask.get()
-
-        if len(particles) % batch_size != 0:
-            errors.append("Input batch size has to change so that the number of input particles "
-                          "is divisible by the input batch size")
 
         if vol is None:
             errors.append("A volume is required. Please, select a valid and adecuate volume for your dataset")
