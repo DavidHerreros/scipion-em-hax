@@ -214,12 +214,11 @@ class JaxProtPredictHetSiren(ProtAnalysis3D, ProtFlexBase):
         self.runJob(program, args + f'--mode predict --reload {out_path}', numberOfMpi=1)
 
     def createOutputStep(self):
-        inputParticles = self.inputParticles.get()
         out_path_vols = self._getExtraPath('volumes')
         model_path = self._getHetSirenProtocol()._getExtraPath('HetSIREN')
         md_file = self._getFileName('predictedFn')
         out_path = self._getHetSirenProtocol()._getExtraPath()
-        Xdim = inputParticles.getXDim()
+        Xdim = self.inputParticles.getXDim()
         self.newXdim = self._getHetSirenProtocol().boxSize.get()
         correctionFactor = Xdim / self.newXdim
 
@@ -290,26 +289,26 @@ class JaxProtPredictHetSiren(ProtAnalysis3D, ProtFlexBase):
         self.runJob(program, args, numberOfMpi=1)
 
         outVols = self._createSetOfVolumes()
-        outVols.setSamplingRate(inputParticles.getSamplingRate())
+        outVols.setSamplingRate(inputSet.getSamplingRate())
         for idx in range(latents_kmeans.shape[0]):
             outVol = Volume()
-            outVol.setSamplingRate(inputParticles.getSamplingRate())
+            outVol.setSamplingRate(inputSet.getSamplingRate())
 
             ImageHandler().scaleSplines(os.path.join(out_path_vols, f"decoded_volume_{idx:04d}.mrc"),
                                         os.path.join(out_path_vols, f"decoded_volume_{idx:04d}.mrc"),
-                                        finalDimension=inputParticles.getXDim(), overwrite=True)
+                                        finalDimension=inputSet.getXDim(), overwrite=True)
 
             ImageHandler().setSamplingRate(os.path.join(out_path_vols, f"decoded_volume_{idx:04d}.mrc"),
-                                           inputParticles.getSamplingRate())
+                                           inputSet.getSamplingRate())
 
             outVol.setLocation(os.path.join(out_path_vols, f"decoded_volume_{idx:04d}.mrc"))
             outVols.append(outVol)
 
         self._defineOutputs(outputParticles=partSet)
-        self._defineTransformRelation(inputParticles, partSet)
+        self._defineTransformRelation(inputSet, partSet)
 
         self._defineOutputs(outputVolumes=outVols)
-        self._defineTransformRelation(inputParticles, outVols)
+        self._defineTransformRelation(inputSet, outVols)
 
     # --------------------------- INFO functions -----------------------------
     def _summary(self):
