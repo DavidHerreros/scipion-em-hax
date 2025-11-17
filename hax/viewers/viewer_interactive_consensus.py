@@ -31,7 +31,7 @@ import numpy as np
 from pyworkflow.viewer import DESKTOP_TKINTER, WEB_DJANGO, ProtocolViewer
 import pyworkflow.protocol.params as params
 
-from hax.protocols.protocol_interactive_consensus import JaxProtInteractiveFlexConsensus
+from hax.protocols.protocol_interactive_flexconsensus import JaxProtInteractiveFlexConsensus
 from hax.viewers.functions.interactive_histogram import InteractiveHist
 
 class JaxFlexConsensusView(ProtocolViewer):

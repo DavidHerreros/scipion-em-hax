@@ -32,4 +32,4 @@ from .protocol_annotate_space import JaxProtAnnotateSpace
 from .protocol_reconsiren import JaxProtAngularAlignmentReconSiren
 
 from .protocol_predict_hetsiren import JaxProtPredictHetSiren
-from .protocol_interactive_consensus import JaxProtInteractiveFlexConsensus
+from .protocol_interactive_flexconsensus import JaxProtInteractiveFlexConsensus

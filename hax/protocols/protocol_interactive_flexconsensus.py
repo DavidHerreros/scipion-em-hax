@@ -89,7 +89,7 @@ class JaxProtInteractiveFlexConsensus(ProtAnalysis3D, ProtFlexBase):
             pwutils.makePath(data_path)
 
         progName = particles.getFlexInfo().getProgName()
-        data_file = progName + "_1.npy"
+        data_file = progName + ".npy"
 
         z_flex = []
         for particle in particles.iterItems():
@@ -99,11 +99,11 @@ class JaxProtInteractiveFlexConsensus(ProtAnalysis3D, ProtFlexBase):
         np.save(latent_space, z_flex)
 
     def predictStep(self):
-        data_path = self._getFlexConsensusProtocol()._getExtraPath("data")
+        data_path = self._getExtraPath("data")
         batch_size = self.batchSize.get()
         particles = self.inputSet.get()
         progName = particles.getFlexInfo().getProgName()
-        input_space = progName + f"_{1}:" + os.path.join(data_path, progName + f"_{1}.npy")
+        input_space = progName + ":" + os.path.join(data_path, progName + ".npy")
 
         args = ("--input_space %s --batch_size %d --output_path %s " % (input_space, batch_size, self._getExtraPath()))
 
