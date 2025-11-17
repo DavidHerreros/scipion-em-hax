@@ -33,3 +33,4 @@ from .protocol_reconsiren import JaxProtAngularAlignmentReconSiren
 from .protocol_image_gray_scale_adjustment import JaxProtImageAdjustment
 from .protocol_predict_hetsiren import JaxProtPredictHetSiren
 from .protocol_interactive_flexconsensus import JaxProtInteractiveFlexConsensus
+from .protocol_volume_gray_scale_adjustment import JaxProtVolumeAdjustment
