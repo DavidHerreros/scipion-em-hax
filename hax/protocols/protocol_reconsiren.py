@@ -287,7 +287,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
     def createOutputStep(self):
         out_path_vol = self._getExtraPath('reconsiren_map.mrc')
         md_file = self._getFileName('predictedFn')
-        Xdim = self.inputParticles.getXDim()
+        Xdim = self.inputParticles.get().getXDim()
         self.newXdim = self.boxSize.get()
 
         metadata = XmippMetaData(md_file)
