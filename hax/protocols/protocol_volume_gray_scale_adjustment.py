@@ -262,15 +262,16 @@ class JaxProtVolumeAdjustment(ProtAnalysis3D, ProtFlexBase):
         self.runJob(program, args + f'--mode predict --reload {self._getExtraPath()}', numberOfMpi=1)
 
     def createOutputStep(self):
-        inputSet = self.inputParticles.get()
-        out_path = os.path.join(self._getExtraPath(), "volume_adjusted.mrc")
+        volSet = self.inputVolume.get()
+        out_path = os.path.join(self._getExtraPath(), "adjusted_volume.mrc")
 
         outVol = Volume()
-        outVol.setSamplingRate(inputSet.getSamplingRate())
+        outVol.setSamplingRate(volSet.getSamplingRate())
+        outVol.copyInfo(volSet)
         outVol.setLocation(out_path)
 
         self._defineOutputs(outputVolume=outVol)
-        self._defineTransformRelation(inputSet, outVol)
+        self._defineTransformRelation(volSet, outVol)
 
     # --------------------------- INFO functions -----------------------------
     def _summary(self):
