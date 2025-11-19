@@ -27,26 +27,22 @@
 
 import os
 import numpy as np
-from sklearn.cluster import KMeans
 
 from xmipp_metadata.metadata import XmippMetaData
 from xmipp_metadata.image_handler import ImageHandler
 
 import pyworkflow.protocol.params as params
-from pyworkflow.object import String
 from pyworkflow.utils.path import moveFile
 from pyworkflow import VERSION_1
 from pyworkflow.utils import getExt, makePath
 
 from pwem.protocols import ProtAnalysis3D, ProtFlexBase
 from pwem.objects import Volume, Particle
-from pwem import ALIGN_PROJ
 
 import xmipp3
 from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 
 import hax
-import hax.constants as const
 
 class JaxProtVolumeAdjustment(ProtAnalysis3D, ProtFlexBase):
     """ Protocol for volume gray values adjustment with the Volume Gray Scale Adjustment algorithm."""
