@@ -100,7 +100,7 @@ class JaxProtVolumeAdjustment(ProtAnalysis3D, ProtFlexBase):
                       help='When set to Yes, you will be able to provide a previously trained network to refine it with new '
                            'data. If set to No, you will train a new network from scratch.')
 
-        form.addParam('predictsValue', params.BooleanParam, default=False,
+        form.addParam('predictsPerVoxel', params.BooleanParam, default=False,
                       label='Predict per voxel adjustment?', expertLevel=params.LEVEL_ADVANCED,
                       help='If not provided, the adjustment will be estimated per voxel - otherwise, adjustment will be estimated for the whole volume.')
 
@@ -243,7 +243,7 @@ class JaxProtVolumeAdjustment(ProtAnalysis3D, ProtFlexBase):
         else:
             args += '--ctf_type None '
 
-        if self.predictsValue:
+        if not self.predictsPerVoxel:
             args += '--predicts_value '
 
         if self.lazyLoad:
