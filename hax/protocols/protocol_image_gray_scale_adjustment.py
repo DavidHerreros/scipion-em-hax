@@ -27,26 +27,23 @@
 
 import os
 import numpy as np
-from sklearn.cluster import KMeans
 
 from xmipp_metadata.metadata import XmippMetaData
 from xmipp_metadata.image_handler import ImageHandler
 
 import pyworkflow.protocol.params as params
-from pyworkflow.object import String
+from pyworkflow.object import Float
 from pyworkflow.utils.path import moveFile
 from pyworkflow import VERSION_1
 from pyworkflow.utils import getExt, makePath
 
 from pwem.protocols import ProtAnalysis3D, ProtFlexBase
 from pwem.objects import Volume, Particle
-from pwem import ALIGN_PROJ
 
 import xmipp3
 from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 
 import hax
-import hax.constants as const
 
 class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
     """ Protocol for image gray values adjustment with the Image Gray Scale Adjustment algorithm."""
@@ -100,7 +97,8 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
                       help='When set to Yes, you will be able to provide a previously trained network to refine it with new '
                            'data. If set to No, you will train a new network from scratch.')
 
-        form.addParam('predictValue', params.BooleanParam, default=True, label='Adjustment prediction',
+        form.addParam('predictsPerPixel', params.BooleanParam, default=False,
+                      label='Predict per pixel adjustment?', expertLevel=params.LEVEL_ADVANCED,
                       help='If not provided, the adjustment will be estimated per pixel - otherwise, adjustment will be estimated per projection.')
 
         form.addParam('lazyLoad', params.BooleanParam, default=False,
@@ -242,7 +240,7 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
         else:
             args += '--ctf_type None '
 
-        if self.predictValue:
+        if not self.predictsPerPixel:
             args += '--predict_value '
 
         if self.lazyLoad:
@@ -264,10 +262,9 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
     def createOutputStep(self):
         inputSet = self.inputParticles.get()
         partSet = self._createSetOfParticles()
-        out_path = os.path.join(self._getExtraPath(), "adjusted_images.mrcs")
+        out_md = os.path.join(self._getExtraPath(), "adjusted_images.xmd")
 
-        md_file = self._getFileName('imgsFn')
-        md = XmippMetaData(md_file)
+        md = XmippMetaData(out_md)
 
         partSet.copyInfo(inputSet)
         partSet.setHasCTF(inputSet.hasCTF())
@@ -278,8 +275,11 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
             outParticle = Particle()
             outParticle.copyInfo(particle)
 
-            image_id, _ = md[idx, "image"].split('@')
-            outParticle.setLocation("@".join([image_id, out_path]))
+            outParticle.setLocation(md[idx, "image"])
+
+            if not self.predictsPerPixel:
+                outParticle.a_adjustment = Float(md[idx, "adjustment_a"])
+                outParticle.b_adjustment = Float(md[idx, "adjustment_b"])
 
             partSet.append(outParticle)
             idx += 1
@@ -303,18 +303,11 @@ class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
         """ Try to find errors on define params. """
         errors = []
 
-        particles = self.inputParticles.get()
-        batch_size = self.batchSize.get()
-
         vol = self.inputVolume.get()
         mask = self.inputVolumeMask.get()
 
-        if len(particles) % batch_size != 0:
-            errors.append("Input batch size has to change so that the number of input particles "
-                          "is divisible by the input batch size")
-
         if vol is None:
-            errors.append("A volume is required. Please, select a valid and adecuate volume for your dataset")
+            errors.append("A volume is required. Please, select a valid and adequate volume for your dataset")
 
         if mask is not None:
             data = ImageHandler(mask.getFileName()).getData()
