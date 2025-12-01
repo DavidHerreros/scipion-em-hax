@@ -30,3 +30,4 @@ from .protocol_hetsiren import JaxProtFlexibleAlignmentHetSiren
 from .protocol_flexconsensus import JaxProtTrainFlexConsensus
 from .protocol_annotate_space import JaxProtAnnotateSpace
 from .protocol_reconsiren import JaxProtAngularAlignmentReconSiren
+from .protocol_zernike3deep import JaxProtTrainZernike3Deep
