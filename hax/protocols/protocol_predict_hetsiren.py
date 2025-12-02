@@ -218,7 +218,7 @@ class JaxProtPredictHetSiren(ProtAnalysis3D, ProtFlexBase):
         model_path = self._getHetSirenProtocol()._getExtraPath('HetSIREN')
         md_file = self._getFileName('predictedFn')
         out_path = self._getHetSirenProtocol()._getExtraPath()
-        Xdim = self.inputParticles.getXDim()
+        Xdim = self.inputParticles.get().getXDim()
         self.newXdim = self._getHetSirenProtocol().boxSize.get()
         correctionFactor = Xdim / self.newXdim
 

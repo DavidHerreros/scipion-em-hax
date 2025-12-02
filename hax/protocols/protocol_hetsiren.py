@@ -308,7 +308,7 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         model_path = self._getExtraPath('HetSIREN')
         md_file = self._getFileName('predictedFn')
         out_path = self._getExtraPath()
-        Xdim = self.inputParticles.getXDim()
+        Xdim = self.inputParticles.get().getXDim()
         self.newXdim = self.boxSize.get()
 
         metadata = XmippMetaData(md_file)

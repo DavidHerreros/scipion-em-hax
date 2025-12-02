@@ -75,7 +75,7 @@ class Plugin(pwplugin.Plugin):
         
         # Create conda environment
         conda_env_installed = "conda_env_installed"
-        commands_conda_env = f"{conda_activation_command} conda create -n hax python=3.10 && touch {conda_env_installed}"
+        commands_conda_env = f"{conda_activation_command} conda create -n hax -y python=3.10 && touch {conda_env_installed}"
         installation_commands.append((commands_conda_env, conda_env_installed))
 
         # Install Hax
