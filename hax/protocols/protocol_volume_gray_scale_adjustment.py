@@ -199,8 +199,8 @@ class JaxProtVolumeAdjustment(ProtAnalysis3D, ProtFlexBase):
         epochs = self.epochs.get()
         latDim = self.latDim.get()
         sr = self.inputParticles.get().getSamplingRate()
-        args = "--md %s --vol %s --sr %f --lat_dim %d --output_path %s " \
-               % (md_file, vol_file, sr, latDim, out_path)
+        args = "--md %s --vol %s --sr %f --lat_dim %d --epochs %d --batch_size %d learning_rate %f --output_path %s " \
+               % (md_file, vol_file, sr, latDim, epochs, batch_size, learningRate, out_path)
 
         if self.inputVolumeMask.get():
             args += '--mask %s ' % mask_file
@@ -229,7 +229,7 @@ class JaxProtVolumeAdjustment(ProtAnalysis3D, ProtFlexBase):
         program = hax.Plugin.getProgram("volume_gray_scale_adjustment", gpu)
         if not os.path.isdir(self._getExtraPath("volumeAdjustment")):
             self.runJob(program,
-                        args + f'--mode train --epochs {epochs} --batch_size {batch_size} --learning_rate {learningRate} --reload {self._getExtraPath()}'
+                        args + f'--mode train --reload {self._getExtraPath()}'
                         if self.fineTune else args + '--mode train',
                         numberOfMpi=1)
         self.runJob(program, args + f'--mode predict --reload {self._getExtraPath()}', numberOfMpi=1)
