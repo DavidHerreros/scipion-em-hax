@@ -26,7 +26,6 @@
 
 
 import os
-import re
 from glob import glob
 
 import numpy as np
@@ -34,23 +33,22 @@ from xmipp_metadata.metadata import XmippMetaData
 from xmipp_metadata.image_handler import ImageHandler
 
 import pyworkflow.protocol.params as params
-from pyworkflow.object import String, Boolean, Float
 from pyworkflow.utils.path import moveFile
 from pyworkflow import VERSION_2_0
 
-from pwem.protocols import ProtAnalysis3D
-import pwem.emlib.metadata as md
+from pwem.protocols import ProtAnalysis3D, ProtFlexBase
 from pwem.constants import ALIGN_PROJ, ALIGN_NONE
-from pwem.objects import Volume, Particle
+from pwem.objects import Volume, ParticleFlex
 
 from xmipp3.convert import createItemMatrix, setXmippAttributes, writeSetOfParticles, \
     geometryFromMatrix, matrixFromGeometry
 import xmipp3
 
 import hax
+import hax.constants as const
 
 
-class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
+class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
     """ Ab initio reconstruction and global assignation with ReconSIREN neural network."""
     _label = 'angular align - ReconSIREN'
     _lastUpdateVersion = VERSION_2_0
@@ -292,6 +290,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
 
         metadata = XmippMetaData(md_file)
         correctionFactor = Xdim / self.newXdim
+        latent_space = np.asarray([np.fromstring(item, sep=',') for item in metadata[:, 'latent_space']])
         euler_rot = metadata[:, 'angleRot']
         euler_tilt = metadata[:, 'angleTilt']
         euler_psi = metadata[:, 'anglePsi']
@@ -299,7 +298,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         shift_y = correctionFactor * metadata[:, 'shiftY']
 
         inputSet = self.inputParticles.get()
-        partSet = self._createSetOfParticles()
+        partSet = self._createSetOfParticlesFlex(progName=const.RECONSIREN)
 
         partSet.copyInfo(inputSet)
         partSet.setHasCTF(inputSet.hasCTF())
@@ -308,8 +307,9 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
 
         idx = 0
         for particle in inputSet.iterItems():
-            outParticle = Particle()
+            outParticle = ParticleFlex(progName=const.HETSIREN)
             outParticle.copyInfo(particle)
+            outParticle.setZFlex(latent_space[idx])
 
             # Set new transformation matrix
             tr = matrixFromGeometry(np.array([shift_x[idx], shift_y[idx], 0.0]),
@@ -331,11 +331,26 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D):
         outVol.setLocation(out_path_vol)
         outVols.append(outVol)
 
+        outHetVols = self._createSetOfVolumes()
+        outHetVols.setSamplingRate(inputSet.getSamplingRate())
+        for file in glob(self._getExtraPath('reconsiren_hetmap*')):
+            outHetVol = Volume()
+            outHetVol.setSamplingRate(inputSet.getSamplingRate())
+
+            ImageHandler().scaleSplines(file, file, finalDimension=inputSet.getXDim(), overwrite=True)
+            ImageHandler().setSamplingRate(file, inputSet.getSamplingRate())
+
+            outHetVol.setLocation(file)
+            outHetVols.append(outHetVol)
+
         self._defineOutputs(outputParticles=partSet)
         self._defineTransformRelation(inputSet, partSet)
 
         self._defineOutputs(outputVolumes=outVols)
         self._defineTransformRelation(inputSet, outVols)
+
+        self._defineOutputs(outputHetVolumes=outHetVols)
+        self._defineTransformRelation(inputSet, outHetVols)
 
 
     # --------------------------- UTILS functions -----------------------

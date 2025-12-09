@@ -26,4 +26,5 @@
 
 ZERNIKE3D = "Zernike3D"
 HETSIREN = "HetSIREN"
+RECONSIREN = "ReconSIREN"
 FLEXCONSENSUS = "FlexConsensus"
