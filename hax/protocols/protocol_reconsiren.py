@@ -331,7 +331,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
         outVol.setLocation(out_path_vol)
         outVols.append(outVol)
 
-        outHetVols = self._createSetOfVolumes()
+        outHetVols = self._createSetOfVolumes(suffix='Het')
         outHetVols.setSamplingRate(inputSet.getSamplingRate())
         for file in glob(self._getExtraPath('reconsiren_hetmap*')):
             outHetVol = Volume()
