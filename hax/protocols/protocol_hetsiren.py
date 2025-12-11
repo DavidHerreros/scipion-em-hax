@@ -272,7 +272,7 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         newXdim = self.boxSize.get()
         correctionFactor = self.inputParticles.get().getXDim() / newXdim
         sr = correctionFactor * self.inputParticles.get().getSamplingRate()
-        args = "--md %s --sr %f --lat_dim %d --epochs %d --batch_size %d --learning_rate %s --output_path %s --denoising_strength %f" \
+        args = "--md %s --sr %f --lat_dim %d --epochs %d --batch_size %d --learning_rate %s --output_path %s --denoising_strength %f " \
                % (md_file, sr, latDim, epochs, batch_size, learningRate, out_path, denoisingStrength)
 
         if self.inputVolume.get():
