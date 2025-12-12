@@ -210,8 +210,6 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
                     self.runJob("xmipp_image_resize",
                                 "-i %s --dim %d --interp nearest" % (fnVolMask, vol_mask_dim), numberOfMpi=1,
                                 env=xmipp3.Plugin.getEnviron())
-        else:
-            ImageHandler().createCircularMask(fnVolMask, boxSize=vol_mask_dim, is3D=True)
 
         writeSetOfParticles(inputParticles, imgsFn)
 
