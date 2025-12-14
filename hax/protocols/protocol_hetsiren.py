@@ -158,6 +158,14 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
                             "often 0.0001. If training fails or errors explode, try making the lr 10 times smaller (e.g., "
                             "0.001 --> 0.0001).")
 
+        group = form.addGroup("Network regularization")
+        group.addParam('denoisingStrength', params.FloatParam, default=1e-4, label='Denoising strength',
+                       expertLevel=params.LEVEL_ADVANCED,
+                       help="Determines how strongly HetSIREN will learn to remove noise from the resulting volumes. "
+                            "Increasing the value of this parameter will result in a stronger regularization of the noise,"
+                            " but it may affect the protein signal as well. (NOTE: We recommend setting this parameter in "
+                            "the range 0.0001 to 0.1)")
+
         form.addSection(label='Reconstruction')
         form.addParam('massTransport', params.BooleanParam, default=True,
                       expertLevel=params.LEVEL_ADVANCED,
@@ -260,11 +268,12 @@ class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
         learningRate = self.learningRate.get()
         epochs = self.epochs.get()
         latDim = self.latDim.get()
+        denoisingStrength = self.denoisingStrength.get()
         newXdim = self.boxSize.get()
         correctionFactor = self.inputParticles.get().getXDim() / newXdim
         sr = correctionFactor * self.inputParticles.get().getSamplingRate()
-        args = "--md %s --sr %f --lat_dim %d --epochs %d --batch_size %d --learning_rate %s --output_path %s " \
-               % (md_file, sr, latDim, epochs, batch_size, learningRate, out_path)
+        args = "--md %s --sr %f --lat_dim %d --epochs %d --batch_size %d --learning_rate %s --output_path %s --denoising_strength %f " \
+               % (md_file, sr, latDim, epochs, batch_size, learningRate, out_path, denoisingStrength)
 
         if self.inputVolume.get():
             args += '--vol %s ' % vol_file
