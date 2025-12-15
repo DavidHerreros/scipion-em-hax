@@ -28,6 +28,7 @@
 
 import os
 import subprocess
+import sys
 
 import pyworkflow.plugin as pwplugin
 
@@ -72,7 +73,8 @@ class Plugin(pwplugin.Plugin):
     def defineBinaries(cls, env):
         installation_commands = []
         conda_activation_command = cls.getCondaActivationCmd()
-        
+        isDevelInstall = "--devel" in sys.argv
+
         # Create conda environment
         conda_env_installed = "conda_env_installed"
         commands_conda_env = f"{conda_activation_command} conda create -n hax -y python=3.10 && touch {conda_env_installed}"
@@ -80,7 +82,12 @@ class Plugin(pwplugin.Plugin):
 
         # Install Hax
         hax_installed = "hax_installed"
-        hax_pip_package = "git+https://github.com/DavidHerreros/Hax@master"  # TODO: Change this in the future to released package in Pypi
+        if isDevelInstall:
+            print("Installing Hax from devel branch and editable mode...")
+
+            hax_pip_package = f" -e git+https://github.com/DavidHerreros/Hax@devel --src ./"
+        else:
+            hax_pip_package = "git+https://github.com/DavidHerreros/Hax@master"  # TODO: Change this in the future to released package in Pypi
         commands_hax = f"{conda_activation_command} {cls.getEnvActivation()} && pip install {hax_pip_package} && touch {hax_installed}"
         installation_commands.append((commands_hax, hax_installed))
 
