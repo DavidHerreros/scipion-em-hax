@@ -87,7 +87,7 @@ class Plugin(pwplugin.Plugin):
         if isDevelInstall:
             print("Installing Hax from devel branch and editable mode...")
 
-            hax_pip_package = f" -e git+https://github.com/DavidHerreros/Hax@devel --src {emConfig.EM_ROOT}"
+            hax_pip_package = f"git+https://github.com/DavidHerreros/Hax@devel --src {emConfig.EM_ROOT}"
         else:
             hax_pip_package = "git+https://github.com/DavidHerreros/Hax@master"  # TODO: Change this in the future to released package in Pypi
         commands_hax = f"{conda_activation_command} {cls.getEnvActivation()} && pip install {hax_pip_package} && touch {hax_installed}"
