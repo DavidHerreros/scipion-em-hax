@@ -114,17 +114,26 @@ class JaxProtCryoCheck(ProtAnalysis2D, ProtFlexBase):
                             "often 0.0001. If training fails or errors explode, try making the lr 10 times smaller (e.g., "
                             "0.001 --> 0.0001).")
 
+        group.addParam('sr', params.FloatParam, default=1.0, label='Sampling rate',
+                       help="Sampling rate of the input data.")
+
+        # gruoup-addParam mode
+        # data set split fraction
+        # output path
+        #reload
+        #num gaussians
+
+        
+
         form.addParallelSection(threads=0, mpi=4)
 
-        #qui mancano alcuni che ho in arg parse chiedere
 
     def _createFilenameTemplates(self):
         """ Centralize how files are called """
         myDict = {
             'imgsFn': self._getExtraPath('input_particles.xmd'),
-           # 'predictedFn': self._getExtraPath('predicted_latents.xmd'),
+            'predictedFn': self._getExtraPath('md_final_predictions.xmd'), #chiedi
             'fnVol': self._getExtraPath('volume.mrc'),
-           # 'fnVolMask': self._getExtraPath('mask.mrc'),
         }
         self._updateFilenamesDict(myDict)
               
@@ -138,7 +147,6 @@ class JaxProtCryoCheck(ProtAnalysis2D, ProtFlexBase):
     def writeMetaDataStep(self):
         imgsFn = self._getFileName('imgsFn')
         fnVol = self._getFileName('fnVol')
-        #fnVolMask = self._getFileName('fnVolMask')
 
         inputParticles = self.inputParticles.get()
         Xdim = inputParticles.getXDim()
@@ -153,40 +161,38 @@ class JaxProtCryoCheck(ProtAnalysis2D, ProtFlexBase):
                         env=xmipp3.Plugin.getEnviron())
         ih.setSamplingRate(fnVol, inputParticles.getSamplingRate())
 
-       # if self.inputVolumeMask.get():
-       #     ih = ImageHandler()
-       #     inputMask = self.inputVolumeMask.get().getFileName()
-       #     if inputMask:
-       #         ih.convert(self._getXmippFileName(inputMask), fnVolMask)
-       #         curr_mask_dim = ImageHandler(self._getXmippFileName(inputMask)).getDimensions()[-1]
-       #         if curr_mask_dim != Xdim:
-        #            self.runJob("xmipp_image_resize",
-         #                       "-i %s --dim %d --interp nearest" % (fnVolMask, Xdim), numberOfMpi=1,
-          #                      env=xmipp3.Plugin.getEnviron())
-
         writeSetOfParticles(inputParticles, imgsFn)
 
-        # Write extra attributes (if needed)
-        md = XmippMetaData(imgsFn)
-        if hasattr(inputParticles.getFirstItem(), "_xmipp_subtomo_labels"):
-            labels = np.asarray([int(particle._xmipp_subtomo_labels) for particle in inputParticles.iterItems()])
-            md[:, "subtomo_labels"] = labels
-        md.write(imgsFn, overwrite=True)
+        # Resize images
+        if newXdim != Xdim:
+            params = "-i %s -o %s --save_metadata_stack %s --fourier %d" % \
+                     (imgsFn,
+                      self._getTmpPath('scaled_particles.stk'),
+                      self._getExtraPath('scaled_particles.xmd'),
+                      newXdim)
+            if self.numberOfMpi.get() > 1:
+                params += " --mpi_job_size %d" % int(inputParticles.getSize() / self.numberOfMpi.get())
+            self.runJob("xmipp_image_resize", params, numberOfMpi=self.numberOfMpi.get(),
+                        env=xmipp3.Plugin.getEnviron())
+            moveFile(self._getExtraPath('scaled_particles.xmd'), imgsFn)
+
 
     def trainingPredictStep(self):
         md_file = self._getFileName('imgsFn')
         vol_file = self._getFileName('fnVol')
-        #mask_file = self._getFileName('fnVolMask')
-        out_path = self._getExtraPath()
-        if not os.path.isdir(out_path):
-            os.mkdir(out_path)
+        
+        # scipion crea in automatico la cartella di output se non esiste
+        #out_path = self._getExtraPath()
+        #if not os.path.isdir(out_path):  #vedi
+         #   os.mkdir(out_path)
+        
         batch_size = self.batchSize.get()
         learningRate = self.learningRate.get()
         epochs = self.epochs.get()
        # latDim = self.latDim.get()
         sr = self.inputParticles.get().getSamplingRate()
         args = "--md %s --vol %s --sr %f --epochs %d --batch_size %d --learning_rate %f --output_path %s " \
-               % (md_file, vol_file, sr, epochs, batch_size, learningRate, out_path)
+               % (md_file, vol_file, sr, epochs, batch_size, learningRate, output_path)
 
         if self.lazyLoad:
             args += '--load_images_to_ram '
@@ -200,37 +206,34 @@ class JaxProtCryoCheck(ProtAnalysis2D, ProtFlexBase):
             gpu = None
 
         program = hax.Plugin.getProgram("cryocheck", gpu)
-        if not os.path.isdir(self._getExtraPath("cryocheck_output")):  #ma il  nome dell'output deve essere lo stesso che si trova nel programma di cryocheck
+        if not os.path.isdir(self._getExtraPath("cryocheck_model")):  
             self.runJob(program,
-                        args + f'--mode train --reload {self._getExtraPath()}'
+                        args + f'--mode train --reload {self._getExtraPath("cryocheck_model")}'
                         if self.fineTune else args + '--mode train',
                         numberOfMpi=1)
-        self.runJob(program, args + f'--mode predict --reload {self._getExtraPath()}', numberOfMpi=1)
+        self.runJob(program, args + f'--mode predict --reload {self._getExtraPath("cryocheck_model")}', numberOfMpi=1)
 
 
     def createOutputStep(self):
         inputSet = self.inputParticles.get()
         partSet = self._createSetOfParticles()
-        out_md = os.path.join(self._getExtraPath(), "md_final.xmd")
+        out_md = os.path.join(self._getExtraPath(), "md_final_predictions.xmd") #chiedi se giusto
 
         md = XmippMetaData(out_md)
 
         partSet.copyInfo(inputSet)
-       # partSet.setHasCTF(inputSet.hasCTF())
-       # partSet.setAlignmentProj()
+        partSet.setHasCTF(inputSet.hasCTF())
+        partSet.setAlignmentProj()
 
         idx = 0
         for particle in inputSet.iterItems():
             outParticle = Particle()
             outParticle.copyInfo(particle)
+            
+            outParticle.misaligmnent_score = Float(md[idx, "misalignment_score"])    
 
-            outParticle.setLocation(md[idx, "final_predictions"])
+            partSet.append(outParticle)
 
-            #if not self.predictsPerPixel:
-             #   outParticle.a_adjustment = Float(md[idx, "adjustment_a"])
-              #  outParticle.b_adjustment = Float(md[idx, "adjustment_b"])
-
-            #partSet.append(outParticle)
             idx += 1
 
         self._defineOutputs(outputParticles=partSet)
@@ -272,4 +275,5 @@ class JaxProtCryoCheck(ProtAnalysis2D, ProtFlexBase):
         if getExt(filename) == ".mrc":
             filename += ":mrc"
         return filename
+
 
