@@ -37,7 +37,7 @@ import hax
 
 
 class JaxProtRigidFitting(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol for sharpening with HetSIREN reconstruction."""
+    """ Protocol for rigid fitting models towards 3D Cryo-EM Maps."""
     _label = 'rigid fitting'
     _lastUpdateVersion = VERSION_1
 
@@ -123,10 +123,10 @@ class JaxProtRigidFitting(ProtAnalysis3D, ProtFlexBase):
 
             outputPdb1 = AtomStruct()
             outputPdb1.setFileName(out_path_pdb1)
-            self._defineOutputs(outputStructure1=outputPdb1)
+            self._defineOutputs(outputStructure=outputPdb1)
             outputPdb2 = AtomStruct()
             outputPdb2.setFileName(out_path_pdb2)
-            self._defineOutputs(outputStructure2=outputPdb2)
+            self._defineOutputs(outputStructureRefined=outputPdb2)
 
         else:
             out_path_pdb = os.path.join(self._getExtraPath('pdb_fitted'), f'final_rigid_fitted{ext.lower()}')
@@ -135,10 +135,23 @@ class JaxProtRigidFitting(ProtAnalysis3D, ProtFlexBase):
             outputPdb.setFileName(out_path_pdb)
             self._defineOutputs(outputStructure=outputPdb)
 
-        outVol = Volume()
-        outVol.setSamplingRate(self.inputVolume.get().getSamplingRate())
-        outVol.setFileName(out_path_vol)
-        self._defineOutputs(outputVolume=outVol)
+        if not self.needsCentering:
+            outVol = Volume()
+            outVol.setSamplingRate(self.inputVolume.get().getSamplingRate())
+            outVol.setFileName(out_path_vol)
+            self._defineOutputs(outputVolume=outVol)
+        else:
+            out_path_vol_center = os.path.join(self._getExtraPath('pdb_fitted'), 'final_rigid_center.mrc')
+
+            outVol1 = Volume()
+            outVol1.setSamplingRate(self.inputVolume.get().getSamplingRate())
+            outVol1.setFileName(out_path_vol)
+            self._defineOutputs(outputVolume=outVol1)
+
+            outVol2 = Volume()
+            outVol2.setSamplingRate(self.inputVolume.get().getSamplingRate())
+            outVol2.setFileName(out_path_vol_center)
+            self._defineOutputs(outputVolumeCenter=outVol2)
 
     # --------------------------- INFO functions -----------------------------
     def _summary(self):

@@ -127,9 +127,9 @@ class JaxProtSharpeningHetSiren(ProtAnalysis3D, ProtFlexBase):
                        allowsNull=True,
                        help='When the gaussian fitting is computed and the number of gaussians are set, the network tries to adapt this number of gaussians '
                             'based on the sizes of the gaussians and the gradients of the model. This adaptation is done by a series of '
-                            'pruning and splitting processes by specific densification intervals. The number of gaussians may increase or decrease depending '
-                            'on the nature of the volume and the model gradients. The bigger this interval, the less number of gaussians will be '
-                            'created when finished the adaptation.')
+                            'pruning and splitting processes each time this specific densification interval is accounted for. '
+                            'The number of gaussians may increase or decrease depending on the nature of the volume and the model gradients. '
+                            'The bigger this interval, the less number of gaussians will be created when finished the adaptation.')
         group.addParam('maxGaussians', params.IntParam, default=50000, label='Maximum number of gaussians',
                        allowsNull=True,
                        help='When the gaussian fitting is computed, depending on the densification interval and the initial number of gaussians, '
