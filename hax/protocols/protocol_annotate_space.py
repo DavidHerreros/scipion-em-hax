@@ -205,27 +205,24 @@ class JaxProtAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
         elif progName == "Dynamight":
             from relion.dynamight.annotate_space_arguments import getAnnotateSpaceArguments
             if gpu:
-                args += f" {getAnnotateSpaceArguments(particles, gpu_id=gpu)}"
+                args += f" {getAnnotateSpaceArguments(particles, gpu_id=0)}"
             else:
                 args += f" {getAnnotateSpaceArguments(particles)}"
         elif progName == "Opus-DSD":
             from opusdsd.utils.utils import getAnnotateSpaceArguments
             if gpu:
-                args += f" {getAnnotateSpaceArguments(particles, gpu_id=gpu)}"
+                args += f" {getAnnotateSpaceArguments(particles, gpu_id=0)}"
             else:
                 args += f" {getAnnotateSpaceArguments(particles)}"
         elif progName == "CryoDRGN":
             from cryodrgn.utils.utils import getAnnotateSpaceArguments
             if gpu:
-                args += f" {getAnnotateSpaceArguments(particles, gpu_id=gpu)}"
+                args += f" {getAnnotateSpaceArguments(particles, gpu_id=0)}"
             else:
                 args += f" {getAnnotateSpaceArguments(particles)}"
         elif progName == "cryoSPARC":
             from cryosparc2.threeDFlex.annotate_space_arguments import getAnnotateSpaceArguments
-            if gpu:
-                args += f" {getAnnotateSpaceArguments(particles, gpu_id=gpu)}"
-            else:
-                args += f" {getAnnotateSpaceArguments(particles, gpu_id=0)}"
+            args += f" {getAnnotateSpaceArguments(particles, gpu_id=0)}"
         elif progName == "ReconSIREN":
             from hax.annotate_space_functions.annotate_space_arguments import getReconSIRENArguments
             args += f" {getReconSIRENArguments(particles)}"
