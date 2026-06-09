@@ -189,6 +189,34 @@ class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
 
             idx += 1
 
+        # Consensus space (average of all latent spaces)
+        idx = 0
+        consensus_space = 0.0
+        for inputSet in self.inputSets:
+            inputSet = inputSet.get()
+            progName = inputSet.getFlexInfo().getProgName()
+            consensus_space += np.load(self._getExtraPath(progName + f"_{idx}_consensus.npy"))
+            idx += 1
+        consensus_space = consensus_space / len(self.inputSets)
+
+        inputSet = self.inputSets[0].get()
+        progName = inputSet.getFlexInfo().getProgName()
+        outputSet = self._createSetOfParticlesFlex(progName=progName, suffix=f"_{len(self.inputSets) + 1}")
+        outputSet.copyInfo(inputSet)
+        outputSet.setHasCTF(inputSet.hasCTF())
+        outputSet.setAlignmentProj()
+
+        idl = 0
+        for particle in inputSet.iterItems():
+            outParticle = ParticleFlex(progName=const.FLEXCONSENSUS)
+            outParticle.copyInfo(particle)
+            outParticle.setZRed(consensus_space[idl])
+            outputSet.append(outParticle)
+            idl += 1
+
+        self._defineOutputs(**{f"outputParticles_FlexConsensus_Average": outputSet})
+        self._defineTransformRelation(inputSet, outputSet)
+
         # --------------------------- INFO functions -----------------------------
 
     def _summary(self):
