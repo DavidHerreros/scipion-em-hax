@@ -39,10 +39,9 @@ from pyworkflow.utils import getExt
 
 from pwem.protocols import ProtAnalysis3D, ProtFlexBase
 from pwem.constants import ALIGN_PROJ, ALIGN_NONE
-from pwem.objects import Volume, ParticleFlex, String
+from pwem.objects import Volume, ParticleFlex, String, SetOfParticles
 
-from xmipp3.convert import createItemMatrix, setXmippAttributes, writeSetOfParticles, \
-    geometryFromMatrix, matrixFromGeometry
+from xmipp3.convert import writeSetOfParticles, matrixFromGeometry, geometryFromMatrix
 import xmipp3
 
 import hax
@@ -68,7 +67,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
                        help="Add a list of GPU devices that can be used")
 
         group = form.addGroup("Data")
-        group.addParam('inputParticles', params.PointerParam, label="Input particles", pointerClass='SetOfParticles',
+        group.addParam('inputParticles', params.PointerParam, label="Input particles", pointerClass='SetOfParticles, SetOfClasses2D',
                        important=True,
                        help="If your particles do not have alignment information, ReconSIREN will learn the pose and in plane shifts "
                             "from scratch. Otherwise, the current alignment of the particles will be refined.")
@@ -97,6 +96,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
                             'network.')
 
         group.addParam('ctfType', params.EnumParam, choices=['None', 'Apply', 'Wiener', 'Precorrect'],
+                       condition='inputParticles and not isinstance(inputParticles, SetOfClasses2D)',
                        default=1, label="CTF correction type",
                        display=params.EnumParam.DISPLAY_HLIST,
                        expertLevel=params.LEVEL_ADVANCED,
@@ -106,7 +106,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
                             "* *Precorrect: similar to Wiener but CTF has already been corrected")
 
         group.addParam('refineCurrent', params.BooleanParam, default=False,
-                       condition='inputParticles and inputParticles.hasAlignmentProj',
+                       condition='inputParticles and not isinstance(inputParticles, SetOfClasses2D) and inputParticles.hasAlignmentProj',
                        label="Refine current particle alignments?")
 
         group.addParam('refineVolume', params.BooleanParam, default=True,
@@ -193,7 +193,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
         fnVolMask = self._getFileName('fnVolMask')
 
         inputParticles = self.inputParticles.get()
-        Xdim = inputParticles.getXDim()
+        Xdim = inputParticles.getXDim() if isinstance(inputParticles, SetOfParticles) else inputParticles.getFirstItem().getXDim()
         newXdim = self.boxSize.get()
         vol_mask_dim = newXdim
 
@@ -219,21 +219,29 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
                                 "-i %s --dim %d --interp nearest" % (fnVolMask, vol_mask_dim), numberOfMpi=1,
                                 env=xmipp3.Plugin.getEnviron())
 
-        writeSetOfParticles(inputParticles, imgsFn)
+        if isinstance(inputParticles, SetOfParticles):
+            writeSetOfParticles(inputParticles, imgsFn)
+        else:
+            inputParticles.writeStack(self._getTmpPath('scaled_particles.stk'))
+            XmippMetaData(file_name=self._getTmpPath('scaled_particles.stk')).write(imgsFn)
 
         if newXdim != Xdim:
-            params = "-i %s -o %s --save_metadata_stack %s --fourier %d" % \
-                     (imgsFn,
-                      self._getTmpPath('scaled_particles.stk'),
-                      self._getExtraPath('scaled_particles.xmd'),
-                      newXdim)
-            if self.numberOfMpi.get() > 1:
-                params += " --mpi_job_size %d" % int(inputParticles.getSize() / self.numberOfMpi.get())
-            self.runJob("xmipp_image_resize", params, numberOfMpi=self.numberOfMpi.get(),
-                        env=xmipp3.Plugin.getEnviron())
-            moveFile(self._getExtraPath('scaled_particles.xmd'), imgsFn)
+            if isinstance(inputParticles, SetOfParticles):
+                params = "-i %s -o %s --save_metadata_stack %s --fourier %d" % \
+                         (imgsFn,
+                          self._getTmpPath('scaled_particles.stk'),
+                          self._getExtraPath('scaled_particles.xmd'),
+                          newXdim)
+                if self.numberOfMpi.get() > 1:
+                    params += " --mpi_job_size %d" % int(inputParticles.getSize() / self.numberOfMpi.get())
+                self.runJob("xmipp_image_resize", params, numberOfMpi=self.numberOfMpi.get(),
+                            env=xmipp3.Plugin.getEnviron())
+                moveFile(self._getExtraPath('scaled_particles.xmd'), imgsFn)
+            else:
+                ImageHandler().scaleSplines(inputFn=self._getTmpPath('scaled_particles.stk'), outputFn=self._getTmpPath('scaled_particles.stk'), finalDimension=newXdim, isStack=True)
 
     def trainingPredictStep(self):
+        inputParticles = self.inputParticles.get()
         md_file = self._getFileName('imgsFn')
         vol_file = self._getFileName('fnVol')
         mask_file = self._getFileName('fnVolMask')
@@ -245,8 +253,9 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
         learningRate = self.learningRate.get()
         epochs = self.epochs.get()
         newXdim = self.boxSize.get()
-        correctionFactor = self.inputParticles.get().getXDim() / newXdim
-        sr = correctionFactor * self.inputParticles.get().getSamplingRate()
+        Xdim = inputParticles.getXDim() if isinstance(inputParticles, SetOfParticles) else inputParticles.getFirstItem().getXDim()
+        correctionFactor = Xdim / newXdim
+        sr = correctionFactor * inputParticles.getSamplingRate()
         args = "--md %s --sr %f --epochs %d --batch_size %d --learning_rate %s --output_path %s --symmetry_group %s " \
                % (md_file, sr, epochs, batch_size, learningRate, out_path, symmetry)
 
@@ -262,7 +271,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
         if not self.refineVolume.get():
             args += "--do_not_learn_volume "
 
-        if self.ctfType != 0:
+        if self.ctfType != 0 and isinstance(inputParticles, SetOfParticles):
             if self.ctfType.get() == 1:
                 args += '--ctf_type apply '
             elif self.ctfType.get() == 2:
@@ -292,10 +301,11 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
         self.runJob(program, args + f'--mode predict --reload {self._getExtraPath()}', numberOfMpi=1)
 
     def createOutputStep(self):
+        inputSet = self.inputParticles.get()
         out_path_vol = self._getExtraPath('reconsiren_map.mrc')
         model_path = self._getExtraPath('ReconSIREN')
         md_file = self._getFileName('predictedFn')
-        Xdim = self.inputParticles.get().getXDim()
+        Xdim = inputSet.getXDim() if isinstance(inputSet, SetOfParticles) else inputSet.getFirstItem().getXDim()
         self.newXdim = self.boxSize.get()
 
         metadata = XmippMetaData(md_file)
@@ -307,28 +317,54 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
         shift_x = correctionFactor * metadata[:, 'shiftX']
         shift_y = correctionFactor * metadata[:, 'shiftY']
 
-        inputSet = self.inputParticles.get()
         partSet = self._createSetOfParticlesFlex(progName=const.RECONSIREN)
 
-        partSet.copyInfo(inputSet)
-        partSet.setHasCTF(inputSet.hasCTF())
+        partSet.copyInfo(inputSet) if isinstance(inputSet, SetOfParticles) else partSet.copyInfo(inputSet.getImages())
+        partSet.setHasCTF(inputSet.hasCTF()) if isinstance(inputSet, SetOfParticles) else partSet.setHasCTF(inputSet.getImages().hasCTF())
         partSet.setAlignmentProj()
         inverseTransform = partSet.getAlignment() == ALIGN_PROJ
 
-        idx = 0
-        for particle in inputSet.iterItems():
-            outParticle = ParticleFlex(progName=const.RECONSIREN)
-            outParticle.copyInfo(particle)
-            outParticle.setZFlex(latent_space[idx])
+        # For SetOfParticles input
+        if isinstance(inputSet, SetOfParticles):
+            idx = 0
+            for particle in inputSet.iterItems():
+                outParticle = ParticleFlex(progName=const.RECONSIREN)
+                outParticle.copyInfo(particle)
+                outParticle.setZFlex(latent_space[idx])
 
-            # Set new transformation matrix
-            tr = matrixFromGeometry(np.array([shift_x[idx], shift_y[idx], 0.0]),
-                                    np.array([euler_rot[idx], euler_tilt[idx], euler_psi[idx]]),
-                                    inverseTransform)
-            outParticle.getTransform().setMatrix(tr)
+                # Set new transformation matrix
+                tr = matrixFromGeometry(np.array([shift_x[idx], shift_y[idx], 0.0]),
+                                        np.array([euler_rot[idx], euler_tilt[idx], euler_psi[idx]]),
+                                        inverseTransform)
+                outParticle.getTransform().setMatrix(tr)
 
-            partSet.append(outParticle)
-            idx += 1
+                partSet.append(outParticle)
+                idx += 1
+
+        # For SetOfClasses2D input
+        else:
+            idx = 0
+            for class2d in inputSet.iterItems():
+                for particle in class2d:
+                    outParticle = ParticleFlex(progName=const.RECONSIREN)
+                    outParticle.copyInfo(particle)
+                    outParticle.setZFlex(latent_space[idx])
+
+                    # Get current transformation matrix (centering + in-plane rotation)
+                    tr_o = particle.getTransform().getMatrix()
+                    shifts, angles = geometryFromMatrix(tr_o, False)
+                    # print(angles, flush=True)
+                    tr_o = matrixFromGeometry(shifts, -angles, inverseTransform)
+
+                    # Set new transformation matrix
+                    tr = matrixFromGeometry(np.array([shift_x[idx], shift_y[idx], 0.0]),
+                                            np.array([euler_rot[idx], euler_tilt[idx], euler_psi[idx]]),
+                                            inverseTransform)
+
+                    outParticle.getTransform().setMatrix(tr @ tr_o)
+
+                    partSet.append(outParticle)
+                idx += 1
 
         partSet.getFlexInfo().modelPath = String(model_path)
 
@@ -337,7 +373,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
         outVol = Volume()
         outVol.setSamplingRate(inputSet.getSamplingRate())
 
-        ImageHandler().scaleSplines(out_path_vol, out_path_vol, finalDimension=inputSet.getXDim(), overwrite=True)
+        ImageHandler().scaleSplines(out_path_vol, out_path_vol, finalDimension=Xdim, overwrite=True)
         ImageHandler().setSamplingRate(out_path_vol, inputSet.getSamplingRate())
 
         outVol.setLocation(out_path_vol)
@@ -349,7 +385,7 @@ class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
             outHetVol = Volume()
             outHetVol.setSamplingRate(inputSet.getSamplingRate())
 
-            ImageHandler().scaleSplines(file, file, finalDimension=inputSet.getXDim(), overwrite=True)
+            ImageHandler().scaleSplines(file, file, finalDimension=Xdim, overwrite=True)
             ImageHandler().setSamplingRate(file, inputSet.getSamplingRate())
 
             outHetVol.setLocation(file)
