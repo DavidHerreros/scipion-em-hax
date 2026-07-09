@@ -85,7 +85,28 @@ class Plugin(pwplugin.Plugin):
         isDevelInstall = "--devel" in sys.argv
 
         # Find cuda version to be installed
-        cuda_major = max(min(get_max_cuda_version(), 13), 12)
+        max_cuda_version = get_max_cuda_version()
+        if not isinstance(max_cuda_version, int):
+            reason = (max_cuda_version if isinstance(max_cuda_version, str)
+                      else "'nvidia-smi' ran but printed no 'CUDA Version: X.Y' line")
+            raise RuntimeError(
+                f"Could not detect the CUDA version ({reason}).\n"
+                f"Hax needs it to choose between the 'hax-em[cuda12]' and "
+                f"'hax-em[cuda13]' wheels, so it cannot be installed without a "
+                f"working CUDA setup.\n"
+                f"Check that an NVIDIA driver is installed and that 'nvidia-smi' "
+                f"runs successfully, then launch the installation again."
+            )
+        if max_cuda_version < 12:
+            raise RuntimeError(
+                f"The installed NVIDIA driver only supports CUDA "
+                f"{max_cuda_version}, but Hax requires CUDA 12 or later.\n"
+                f"Please update your NVIDIA driver to version 525 or newer "
+                f"(which ships CUDA 12 support), then launch the installation "
+                f"again. There is no need to install CUDA separately: the "
+                f"matching CUDA runtime is installed along with the package."
+            )
+        cuda_major = min(max_cuda_version, 13)
 
         # Create conda environment
         conda_env_installed = "conda_env_installed"
