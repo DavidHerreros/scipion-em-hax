@@ -32,7 +32,7 @@ version = {attr = "hax.__version__"}
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.package-data]
-"hax" = ["logo.png"]
+"hax" = ["logo.png", "protocols.conf"]
 
 [project.entry-points."pyworkflow.plugin"]
 hax = "hax"
