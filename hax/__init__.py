@@ -35,6 +35,8 @@ from pwem import Config as emConfig
 import pyworkflow.plugin as pwplugin
 from hax.utils import get_max_cuda_version
 
+from .constants import DEFAULT_ACTIVATION_CMD, DEFAULT_ENV_NAME, HAX_ENV_ACTIVATION
+
 
 __version__ = "1.0.1"
 _logo = "logo.png"
@@ -43,8 +45,12 @@ _references = []
 class Plugin(pwplugin.Plugin):
 
     @classmethod
+    def _defineVariables(cls):
+        cls._defineVar(HAX_ENV_ACTIVATION, DEFAULT_ACTIVATION_CMD)
+
+    @classmethod
     def getEnvActivation(cls):
-        return "conda activate hax"
+        return cls.getVar(HAX_ENV_ACTIVATION)
 
     @classmethod
     def getProgram(cls, program, gpu, uses_project_manager=True):
@@ -83,7 +89,7 @@ class Plugin(pwplugin.Plugin):
 
         # Create conda environment
         conda_env_installed = "conda_env_installed"
-        commands_conda_env = f"{conda_activation_command} conda create -n hax -y python=3.11 && touch {conda_env_installed}"
+        commands_conda_env = f"{conda_activation_command} conda create -n {DEFAULT_ENV_NAME} -y python=3.11 && touch {conda_env_installed}"
         installation_commands.append((commands_conda_env, conda_env_installed))
 
         # Install Hax

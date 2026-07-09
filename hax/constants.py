@@ -24,6 +24,16 @@
 # *
 # **************************************************************************
 
+def getHaxEnvName():
+    """ Return the name of the conda environment for Hax. """
+    return "hax"
+
+# Conda environment variable
+DEFAULT_ENV_NAME = getHaxEnvName()
+DEFAULT_ACTIVATION_CMD = f"conda activate {DEFAULT_ENV_NAME}"
+HAX_ENV_ACTIVATION = 'HAX_ENV_ACTIVATION'
+
+# Constants for the different programs
 ZERNIKE3D = "Zernike3D"
 HETSIREN = "HetSIREN"
 RECONSIREN = "ReconSIREN"
