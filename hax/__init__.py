@@ -54,7 +54,7 @@ class Plugin(pwplugin.Plugin):
             if gpu is not None:
                 return cmd + f'hax_project_manager --gpu {gpu} {program} '
             else:
-                return cmd + f'hax_project_manager {program} '
+                return cmd + f'QT_DEBUG_PLUGINS=1  hax_project_manager {program} '
         else:
             return cmd + f'{program} '
 

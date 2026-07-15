@@ -226,10 +226,13 @@ class JaxProtAnnotateSpace(ProtAnalysis3D, ProtFlexBase):
                 args += f" {getAnnotateSpaceArguments(particles, gpu_id=gpu)}"
             else:
                 args += f" {getAnnotateSpaceArguments(particles, gpu_id=0)}"
+        elif progName == "XMIPP_DEEP_EMBED":
+            xmippServerPath = self.particles.get().getFlexInfo().getAttr("serverfunc_path")
+            args += f" --server_functions_path {xmippServerPath}"
 
         program = "annotate_space"
         program = hax.Plugin.getProgram(program, gpu=gpu)
-        self.runJob(program, args)
+        self.runJob(f"export QT_DEBUG_PLUGINS=1 && {program}", args)
         if len(glob(self._getExtraPath(os.path.join("Intermediate_results", "selections_layers*/")))) > 0:
             out_files = os.listdir(self._getExtraPath(os.path.join("Intermediate_results", "selections_layers")))
             only_shape_layers = not np.all([os.path.basename(layer_folder).startswith("SHL_") for layer_folder in out_files])
