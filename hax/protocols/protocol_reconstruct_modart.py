@@ -40,8 +40,136 @@ import hax.constants as const
 
 
 class JaxProtReconstructMoDART(ProtReconstruct3D):
-    """    
-    Reconstruct a volume using MoDART algorithm from a given SetOfParticles.
+    """
+    Reconstructs a 3D volume from a set of aligned particle projections using the MoDART algorithm.
+    The protocol estimates a density map directly from experimental images and can optionally start
+    from an initial reference volume, apply masking constraints, incorporate symmetry information,
+    and perform motion-aware reconstruction when flexible-particle information is available.
+
+    AI Generated:
+
+    Reconstruct MoDART (JaxProtReconstructMoDART) — User Manual
+
+        Overview
+
+        The Reconstruct MoDART protocol generates a three-dimensional density map from a set of
+        aligned cryo-EM particle images. Its purpose is to convert the collection of two-dimensional
+        projections into a volumetric reconstruction that represents the underlying molecular
+        structure. In standard cryo-EM workflows, this corresponds to the stage where particle
+        alignment information is transformed into a physically interpretable map.
+
+        For biological users, this protocol is useful both when obtaining a first reconstruction from
+        a curated particle set and when refining a reconstruction using additional prior information.
+        The resulting volume can serve as a map for structural interpretation, downstream refinement,
+        or comparison with other conformational states.
+
+        Inputs and General Workflow
+
+        The protocol requires a set of particles with projection alignment parameters. These alignment
+        parameters define the orientation of each particle and are therefore essential for computing a
+        meaningful reconstruction. The input particle metadata are first converted into an internal
+        metadata representation suitable for the reconstruction engine.
+
+        Reconstruction then proceeds by combining the aligned particle projections according to the
+        specified acquisition geometry and the selected correction settings. The final output is a 3D
+        map written with the same sampling rate as the input dataset, ensuring consistency with the
+        original experimental scale.
+
+        Initial Map and Reconstruction Mask
+
+        An optional initial map can be provided to guide reconstruction. When present, this volume is
+        used as the starting point of the iterative estimation process. This can be useful when prior
+        structural knowledge exists or when continuing analysis from a previous reconstruction.
+
+        A reconstruction mask may also be supplied. The mask restricts the region in which density is
+        estimated, which can improve computational efficiency and reduce the influence of empty solvent
+        regions. From a biological perspective, the mask should include the molecular envelope while
+        excluding unnecessary background. Poorly chosen masks may artificially constrain the
+        reconstruction or suppress genuine peripheral density.
+
+        CTF Handling
+
+        The protocol supports several ways of handling the contrast transfer function. The selected
+        mode determines whether the CTF is ignored, applied to simulated projections, corrected by
+        Wiener filtering, or assumed to have been corrected previously.
+
+        In practical biological workflows, this choice should match the preprocessing history of the
+        particles. Maintaining consistency between the particle images and the reconstruction model is
+        important for obtaining interpretable density and avoiding systematic artifacts.
+
+        Symmetry
+
+        Symmetry can be imposed during reconstruction through the symmetry group parameter. For
+        asymmetric particles, the correct choice is c1. For symmetric complexes, applying the proper
+        symmetry often improves signal-to-noise ratio and can substantially enhance the quality of the
+        final map.
+
+        Biologically, symmetry should only be imposed when it reflects the true structural state of
+        the specimen. Applying incorrect symmetry may force nonphysical averaging and obscure relevant
+        asymmetries or flexible regions.
+
+        Reconstruction Modes
+
+        The protocol offers two main operating modes. In standard reconstruction mode, all particles
+        contribute to the estimation of a single final volume. This is the typical choice for routine
+        map generation.
+
+        In gold-standard mode, the dataset is internally split into two independent halves and two
+        half-maps are reconstructed. These half-maps are essential for downstream resolution
+        estimation, Fourier shell correlation analysis, and local resolution calculations. For most
+        publication-oriented cryo-EM analyses, gold-standard reconstruction is usually the preferred
+        option because it enables more rigorous validation of map quality.
+
+        Motion Correction
+
+        When the input particles originate from flexible-analysis workflows such as HetSIREN or
+        Zernike3Deep, the protocol can optionally perform motion-aware reconstruction. In this mode,
+        particle-specific conformational information is used to reduce motion-blur effects during map
+        estimation.
+
+        From a biological standpoint, this option can be particularly valuable for flexible complexes
+        in which conformational variability would otherwise smear fine structural details. However, it
+        should only be enabled when the particle set contains compatible flexibility metadata.
+
+        Performance and Data Loading
+
+        The reconstruction can be executed using GPU acceleration, which is the intended operating
+        mode for most practical datasets. Batch size controls how many particle images are processed at
+        the same time and therefore directly affects GPU memory usage.
+
+        Particle loading can be configured either through RAM loading or memory-mapped disk access.
+        Loading images into RAM generally provides the highest throughput when memory allows it. For
+        larger datasets, using an SSD or NVMe scratch folder can significantly improve performance by
+        reducing disk I/O bottlenecks.
+
+        Outputs and Interpretation
+
+        The primary output is a reconstructed volume sampled at the same pixel size as the input
+        particles. In gold-standard mode, two additional half-maps are also produced and associated
+        with the final volume.
+
+        Biologically, the resulting map should be interpreted as a reconstruction consistent with the
+        supplied particle orientations, preprocessing assumptions, and reconstruction constraints. The
+        map quality therefore depends strongly on the accuracy of alignment, the suitability of masking
+        and symmetry choices, and the degree of conformational heterogeneity in the particle set.
+
+        Practical Recommendations
+
+        For most routine reconstructions, it is often advisable to begin with standard reconstruction
+        mode, use c1 symmetry unless symmetry is well established, and avoid excessive masking unless
+        the molecular boundaries are known with confidence.
+
+        When flexible particles are available, motion correction can improve local detail, especially
+        in heterogeneous systems. For final-resolution assessment and publication-quality analysis,
+        gold-standard reconstruction should generally be preferred.
+
+        Final Perspective
+
+        For cryo-EM users, MoDART reconstruction is the stage where aligned particle information is
+        transformed into an interpretable three-dimensional density map. Its reliability depends not
+        only on computational settings but also on biologically informed choices regarding symmetry,
+        masking, initial references, and flexibility handling. Careful parameter selection therefore
+        has a direct impact on the structural conclusions drawn from the resulting reconstruction.
     """
     _label = 'reconstruct MoDART'
 

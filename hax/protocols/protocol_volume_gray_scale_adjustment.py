@@ -45,7 +45,131 @@ from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 import hax
 
 class JaxProtVolumeAdjustment(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol for volume gray values adjustment with the Volume Gray Scale Adjustment algorithm."""
+    """
+    Adjusts the gray-scale values of a reference 3D volume so that its projections become more consistent
+    with an experimental particle dataset. The protocol uses a neural-network-based volume adjustment
+    strategy in which a starting map is iteratively refined in intensity space rather than through
+    geometric deformation. Its main purpose is to correct mismatches in density amplitude or local
+    gray-scale behavior that can arise when a reference map and the experimental particle images do not
+    share the same statistical intensity characteristics.
+
+    AI Generated:
+
+    Volume Adjustment (JaxProtVolumeAdjustment) — User Manual
+
+        Overview
+
+        The Volume Adjustment protocol estimates a gray-scale correction model that transforms an input
+        volume into a new map whose simulated projections better agree with the experimental particle
+        images. In practical cryo-EM analysis, this is useful when a reference reconstruction already
+        captures the correct structural arrangement but differs from the particle data in density scale,
+        contrast, or regional intensity balance. Instead of changing the molecular shape, the protocol
+        learns how to adjust the voxel values so the reference becomes more compatible with the observed
+        dataset.
+
+        For biological users, this is particularly relevant when using a map obtained from another
+        reconstruction pipeline, another refinement stage, or another experimental condition. In those
+        cases, the protocol can help standardize the density representation before downstream procedures
+        such as interpretation, comparison, or additional model-based analysis.
+
+        Inputs and Data Preparation
+
+        The protocol requires an input particle set and a starting reference volume. The particles define
+        the experimental observations, while the volume provides the structural template whose gray-scale
+        values will be corrected. During preparation, the reference map is converted into an internal
+        working format and resized if needed so that its dimensions match those of the particle images.
+        The sampling rate is preserved so the resulting adjusted map remains physically meaningful.
+
+        An optional binary mask can also be provided. When present, the adjustment focuses on the masked
+        region, allowing the network to concentrate on biologically relevant density while reducing the
+        influence of solvent or poorly informative regions. If no mask is supplied, the protocol can still
+        proceed, but including a biologically sensible mask often improves robustness and interpretability.
+
+        Particle metadata are also exported before training. If the input dataset contains additional
+        labels, such as subtomogram annotations, these labels are preserved and passed into the training
+        workflow.
+
+        CTF Handling
+
+        The protocol can optionally account for the contrast transfer function. Several modes are
+        available, including applying the CTF to simulated projections, Wiener-based correction, or using
+        already precorrected images. In routine practice, this choice should reflect the state of the
+        particle dataset before entering the protocol.
+
+        When the particle images have already been corrected in earlier preprocessing steps, using the
+        appropriate correction mode helps preserve consistency between the experimental data and the
+        projections generated from the reference map. If no correction is desired, the protocol can ignore
+        CTF effects entirely.
+
+        Network Training and Prediction
+
+        The core of the protocol consists of a neural network trained to infer gray-scale adjustments from
+        the relationship between experimental particles and projections of the reference volume. Training
+        uses standard hyperparameters such as latent dimension, batch size, number of epochs, and learning
+        rate.
+
+        The latent dimension controls the size of the internal representation used by the network. Higher
+        values allow more expressive corrections but may also increase model complexity. The batch size
+        determines GPU memory usage and therefore often becomes the first parameter to adjust when working
+        with limited hardware resources.
+
+        The learning rate controls optimization stability. Large values can cause unstable training or
+        numerical divergence, while smaller values improve robustness but slow convergence. In most
+        practical situations, the default value provides a good starting point.
+
+        A fine-tuning mode is available for continuing from a previously trained network rather than
+        starting from scratch. This is useful when expanding an existing analysis with additional data or
+        refining a previous adjustment without discarding prior learning.
+
+        Adjustment Modes
+
+        The protocol can estimate corrections either per voxel or as a global scalar adjustment. Per-voxel
+        prediction provides spatially varying corrections and is generally the more flexible mode when
+        local intensity mismatches are expected. Global prediction instead estimates a simpler overall
+        adjustment and may be preferable when the discrepancy between map and particles is mostly uniform.
+
+        From a biological perspective, per-voxel prediction is often more informative for heterogeneous
+        density distributions, whereas global correction may be sufficient for simpler normalization tasks.
+
+        Performance and Data Loading
+
+        Data loading can be configured either by loading particles into RAM or by memory mapping from disk.
+        Loading into RAM generally provides better performance when the dataset fits comfortably in memory.
+        Memory mapping is more conservative in RAM usage but can become I/O limited.
+
+        For large particle stacks, especially with box sizes above typical moderate dimensions, using a
+        fast SSD or NVMe scratch directory can significantly improve throughput. GPU execution is supported
+        and is the intended execution mode for most practical datasets.
+
+        Outputs and Interpretation
+
+        After training and prediction, the protocol generates a single adjusted volume. The output retains
+        the structural geometry of the original reference but contains updated gray-scale values estimated
+        from the experimental dataset. The sampling rate and general metadata are preserved so the adjusted
+        volume can be used naturally in downstream workflows.
+
+        Biologically, the resulting map should be interpreted as a density-consistent version of the input
+        reference rather than as a newly reconstructed structure. The protocol does not infer new
+        conformations or recover missing structural information. Instead, it modifies how the existing map
+        represents density so that it better matches the particle observations.
+
+        Practical Recommendations
+
+        In most workflows, it is advisable to start with a high-quality reference map and an appropriate
+        binary mask. The more biologically relevant the masked region, the more likely the adjustment will
+        focus on meaningful signal rather than solvent background.
+
+        If training appears unstable, reducing the learning rate or the batch size is usually the most
+        effective first intervention. When extending previous analyses, fine-tuning often provides a faster
+        and more stable path than retraining from scratch.
+
+        Final Perspective
+
+        For cryo-EM users, volume gray-scale adjustment provides a practical bridge between an existing
+        reference map and a new experimental dataset. Rather than replacing reconstruction, it refines the
+        compatibility between map and particles at the density level. When applied carefully, it can
+        improve consistency for interpretation, downstream comparison, and subsequent flexible analysis.
+    """
     _label = 'predict - Volume Adjustment '
     _lastUpdateVersion = VERSION_1
 

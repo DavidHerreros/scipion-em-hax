@@ -40,7 +40,120 @@ import hax.constants as const
 from hax.utils import getOutputSuffix
 
 class JaxProtInteractiveFlexConsensus(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol to filter particles based on a FlexConsensus network interactively """
+    """
+    Interactively filters particles in a flexible latent space using a previously trained
+    FlexConsensus neural network. The protocol evaluates the latent descriptors associated
+    with each particle and selects only those that satisfy the consensus learned by the
+    network, producing a refined particle subset suitable for downstream structural analysis.
+
+    AI Generated:
+
+    Interactive Consensus - FlexConsensus (JaxProtInteractiveFlexConsensus) — User Manual
+
+        Overview
+
+        The Interactive FlexConsensus protocol is designed to perform particle selection in
+        flexible cryo-EM datasets using a previously trained FlexConsensus neural network.
+        Instead of operating directly on particle images, the protocol works in the latent
+        conformational space associated with each particle. This makes it especially useful
+        in workflows where conformational variability has already been characterized using
+        flexible reconstruction methods such as HetSIREN, ReconSIREN, Zernike3D, or related
+        approaches.
+
+        From a biological perspective, this protocol helps identify particles that belong to
+        coherent conformational regions while excluding particles whose latent descriptors are
+        inconsistent with the consensus model. In practice, this provides a principled way to
+        clean heterogeneous datasets before downstream refinement, classification, variability
+        analysis, or structural interpretation.
+
+        Inputs and General Workflow
+
+        The protocol requires two inputs. The first is a set of flexible particles, meaning a
+        particle set where each particle already contains a latent descriptor representing its
+        conformational state. The second is a previously trained FlexConsensus network, which
+        defines the latent-space manifold used for evaluating whether particles belong to a
+        consistent conformational population.
+
+        During execution, the protocol first extracts the latent coordinates from all input
+        particles and stores them in a numerical latent-space file. These coordinates are then
+        passed to the trained FlexConsensus model, which predicts which particles satisfy the
+        learned consensus criteria. The final output is generated interactively by reading the
+        selected particle indices and constructing a new subset containing only the accepted
+        particles.
+
+        Biological Interpretation
+
+        In flexible cryo-EM analysis, latent spaces often contain mixtures of meaningful
+        conformational states together with transitional particles, noisy assignments, or
+        regions that are poorly sampled. The role of this protocol is not to create new
+        conformational information, but to identify particles that occupy latent-space regions
+        compatible with the previously learned consensus representation.
+
+        For biological users, this means that the output typically represents a more coherent
+        structural population. This can be especially valuable when preparing particles for
+        high-resolution refinement, focused heterogeneity analysis, or interpretation of
+        continuous conformational landscapes. Importantly, the protocol preserves the original
+        particle metadata and flexible descriptors, so the filtered particles remain directly
+        compatible with later flexible-analysis steps.
+
+        Batch Size and Computational Behavior
+
+        The main user-adjustable runtime parameter is the batch size. This controls how many
+        latent vectors are processed simultaneously on the GPU during prediction. Larger batch
+        sizes usually improve throughput but increase GPU memory consumption. Since the
+        protocol operates only on latent descriptors rather than full particle images, memory
+        requirements are generally modest compared with image-based neural-network protocols.
+
+        In most biological workflows, the default value is sufficient. Larger values may be
+        beneficial for very large particle sets, while smaller values may help when GPU memory
+        is limited.
+
+        Latent-Space Compatibility
+
+        A critical requirement is that the latent-space dimensionality of the input particles
+        matches at least one of the latent spaces used to train the provided FlexConsensus
+        model. The protocol explicitly checks this before execution.
+
+        Biologically, this means that the particles must originate from a compatible flexible
+        analysis framework. If the dimensionality does not match, the protocol refuses to run,
+        preventing biologically meaningless predictions caused by incompatible latent
+        representations.
+
+        Outputs and Their Meaning
+
+        The output is a new flexible particle set containing only the particles selected by
+        the consensus network. The output preserves the flexible descriptors, alignment
+        information, and all relevant metadata inherited from the original input set.
+
+        In practical terms, the resulting subset can be interpreted as a consensus-filtered
+        population of particles that better represents the conformational manifold learned by
+        the FlexConsensus model. These particles can be directly used for subsequent
+        refinement, clustering, structural comparison, or focused biological interpretation.
+
+        Practical Recommendations
+
+        In typical biological applications, this protocol is most useful after a flexible
+        analysis has revealed a broad conformational landscape and the user wishes to isolate
+        the most coherent region of that space. It is especially valuable when noisy latent
+        assignments or poorly populated conformational tails interfere with downstream
+        analysis.
+
+        When using this protocol, it is good practice to ensure that the FlexConsensus model
+        was trained on particle sets that are biologically comparable to the current input.
+        The more consistent the training data and prediction data are, the more meaningful the
+        resulting consensus selection will be.
+
+        Final Perspective
+
+        For cryo-EM studies of structural heterogeneity, particle filtering in latent space is
+        often more biologically informative than filtering based solely on image similarity.
+        The Interactive FlexConsensus protocol provides a practical mechanism to translate
+        learned conformational consensus into a physically meaningful subset of particles.
+
+        In this sense, it acts as a bridge between flexible manifold learning and classical
+        downstream cryo-EM refinement, allowing users to focus subsequent analysis on
+        particles that are both computationally consistent and biologically interpretable.
+    """
     _label = 'interactive consensus - FlexConsensus'
     _lastUpdateVersion = VERSION_1
     OUTPUT_PREFIX = 'consensusParticles'

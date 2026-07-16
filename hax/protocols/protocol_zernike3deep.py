@@ -26,7 +26,174 @@ import hax.constants as const
 
 
 class JaxProtTrainZernike3Deep(ProtAnalysis3D, ProtFlexBase):
-    """Protocol to train a FlexConsensus network"""
+    """
+    Trains a Zernike3Deep neural network to learn continuous conformational
+    variability directly from cryo-EM particle images by deforming a reference
+    volume toward the experimental observations. The protocol combines deep
+    latent-space learning with a Zernike3D deformation model, allowing the
+    reconstruction of flexible molecular landscapes rather than a single static
+    structure.
+
+    AI Generated:
+
+    Train Zernike3Deep (JaxProtTrainZernike3Deep) — User Manual
+        Overview
+
+        The Train Zernike3Deep protocol is designed for the analysis of
+        structural flexibility in cryo-EM datasets. Instead of assuming that
+        all particles correspond to one rigid macromolecular conformation, this
+        protocol learns a continuous latent representation describing how the
+        reference map can deform in order to explain the experimental images.
+
+        In biological practice, this is particularly useful when the dataset
+        contains smooth conformational changes, domain motions, breathing
+        effects, or other continuous structural rearrangements that are not
+        well represented by discrete classification alone. Rather than dividing
+        particles into a small number of classes, the protocol places every
+        particle in a learned latent space, where nearby particles correspond
+        to similar conformations.
+
+        Inputs and Data Preparation
+
+        The protocol requires a set of aligned particles together with a
+        reference volume that acts as the structural starting point. During
+        training, the network attempts to deform this reference so that its
+        projections become consistent with the experimental particle images.
+
+        An optional binary mask can also be provided. Biologically, the mask is
+        important because it restricts deformation to the molecular region of
+        interest. This is especially useful when flexible domains are embedded
+        within large solvent regions or when only a specific portion of the
+        structure is expected to move. If no mask is supplied, the protocol
+        automatically generates one.
+
+        If computational memory is limiting, the protocol can downsample the
+        particle images before training. This can make otherwise intractable
+        datasets feasible on smaller GPUs. The tradeoff is a reduction in the
+        final spatial detail of reconstructed conformations. In practice, this
+        option is often useful during exploratory analysis or early parameter
+        optimization.
+
+        CTF Handling
+
+        The protocol supports several strategies for dealing with the contrast
+        transfer function. The CTF may be ignored, applied to the forward
+        projection, corrected through Wiener filtering, or treated as already
+        precorrected.
+
+        From a biological perspective, the choice depends on the state of the
+        input particles and on the upstream processing workflow. Correct CTF
+        treatment is especially important when subtle conformational differences
+        are expected, since incorrect handling may cause the latent space to
+        capture imaging artifacts rather than biologically meaningful motions.
+
+        Neural Network Training
+
+        At the core of the protocol is a neural network that learns a latent
+        representation of conformational variability. Each particle is mapped
+        into a latent vector whose dimensionality is controlled by the latent
+        dimension parameter. Smaller latent spaces enforce simpler global
+        motions, whereas larger latent spaces allow richer and more complex
+        deformations.
+
+        Training proceeds for a user-defined number of epochs and uses mini-
+        batch stochastic optimization. The batch size directly affects GPU
+        memory usage and may also influence the sensitivity of the model to
+        highly localized motions. Smaller batches can sometimes capture subtle
+        flexibility more effectively, whereas larger batches usually improve
+        throughput.
+
+        The learning rate governs the stability of optimization. In practical
+        cryo-EM applications, overly aggressive learning rates may lead to
+        unstable training or divergence, whereas very small learning rates may
+        slow convergence substantially. For most biological datasets, the
+        default value provides a reliable starting point.
+
+        Zernike3D Basis and Deformation Freedom
+
+        Structural deformations are parameterized using a Zernike3D basis. The
+        Zernike degree and spherical harmonics degree jointly determine the
+        expressive power of the deformation model.
+
+        Biologically, low values favor smooth, large-scale collective motions,
+        such as hinge-like rearrangements or rigid-body shifts of domains.
+        Higher values allow finer local rearrangements, but they also increase
+        flexibility and therefore the risk of fitting noise or poorly supported
+        image features.
+
+        For this reason, the choice of basis complexity should ideally reflect
+        the expected scale of the biological motion rather than simply maximizing
+        mathematical freedom.
+
+        Gaussian Volume Representation
+
+        Before latent learning begins, the reference map is approximated by a
+        set of Gaussian components. The protocol can estimate automatically how
+        many Gaussians are needed, or the user may define a fixed number.
+
+        This representation provides a compact deformable model of the input
+        structure. In practice, fixing the number of Gaussians can be useful
+        when the user wants to impose prior biological knowledge, such as
+        relating the representation to residue count, domain granularity, or
+        expected structural complexity.
+
+        Checkpointing and Performance Considerations
+
+        Long training jobs can be resumed from a previous checkpoint. This is
+        particularly useful for large datasets, multi-day runs, or iterative
+        optimization of hyperparameters.
+
+        The protocol also provides different data-loading strategies. When
+        enough RAM is available, loading particles directly into memory usually
+        gives the best training speed. Otherwise, memory-mapped loading is
+        possible, and the use of fast SSD or NVMe scratch storage can greatly
+        improve throughput.
+
+        Outputs and Structural Interpretation
+
+        After training, the protocol predicts a latent coordinate for every
+        particle. These latent vectors are stored in a flexible particle set,
+        together with updated projection geometry and metadata linking the
+        particles to the learned model, the reference map, and the applied mask.
+
+        Biologically, each particle becomes associated with a specific location
+        in conformational space. Nearby particles correspond to similar
+        molecular states, while distant particles represent larger structural
+        differences.
+
+        To facilitate interpretation, the protocol clusters the latent space
+        into representative states and decodes a set of volumes corresponding
+        to the latent-space cluster centers. These decoded maps provide a
+        discrete visualization of the continuous landscape learned by the
+        network.
+
+        This step is often especially valuable for biological interpretation,
+        since it allows users to inspect representative conformations, identify
+        dominant structural transitions, and connect latent-space organization
+        with known biochemical states or functional mechanisms.
+
+        Practical Interpretation
+
+        In exploratory structural biology, this protocol is particularly useful
+        when discrete classification produces blurred classes or when a
+        continuum of conformations is suspected. It often reveals motions that
+        are difficult to isolate by traditional classification methods,
+        including smooth opening and closing events, flexible domain rotations,
+        and correlated collective rearrangements.
+
+        The most meaningful biological interpretation usually comes not from
+        the latent coordinates alone, but from combining latent-space
+        organization, decoded representative volumes, and prior knowledge of
+        molecular function.
+
+        Final Perspective
+
+        For cryo-EM studies of conformational heterogeneity, Zernike3Deep
+        provides a powerful framework to move beyond static reconstruction. By
+        learning how a reference structure continuously deforms across the
+        experimental particle set, the protocol enables a richer and often more
+        biologically faithful description of molecular dynamics.
+    """
 
     _label = "train - Zernike3Deep"
     _lastUpdateVersion = VERSION_1

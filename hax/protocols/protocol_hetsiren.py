@@ -49,7 +49,122 @@ import hax
 import hax.constants as const
 
 class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol for angular alignment with heterogeneous reconstruction with the HetSIREN algorithm."""
+    """
+    Protocol for angular alignment with heterogeneous reconstruction using the
+    HetSIREN algorithm. This protocol estimates particle orientations while
+    simultaneously learning a latent representation of structural variability,
+    allowing continuous heterogeneous states to be modeled directly from
+    cryo-EM particle images.
+
+    AI Generated:
+
+    Flexible Alignment with HetSIREN (JaxProtFlexibleAlignmentHetSiren) — User Manual
+
+    This protocol performs angular alignment and heterogeneous reconstruction by
+    combining image alignment with a neural representation of structural
+    flexibility. Instead of assuming that all particles correspond to a single
+    rigid structure, HetSIREN learns a low-dimensional latent space in which
+    each particle is assigned a continuous coordinate describing its structural
+    state. In practical cryo-EM analysis, this makes the protocol especially
+    useful for proteins or complexes that undergo conformational transitions,
+    domain rearrangements, or continuous motions that cannot be represented
+    adequately by a small number of discrete classes.
+
+    The protocol starts from a set of input particles and optionally from a
+    reference volume. When a reference map is provided, HetSIREN uses it as an
+    initial structural prior and progressively learns how that map must deform
+    in order to explain the heterogeneity present in the experimental data.
+    When no initial map is provided, the network learns the heterogeneous
+    representation directly from the particles. This makes the method suitable
+    both for exploratory analyses, where little prior knowledge is available,
+    and for refinement workflows, where an existing reconstruction already
+    provides a biologically meaningful starting point.
+
+    A reconstruction mask can also be supplied. Its role depends strongly on
+    the selected reconstruction mode. In mass transport mode, the mask defines
+    the region whose density can be displaced across the volume. This is useful
+    when the main biological question concerns large-amplitude motions or
+    significant domain displacements. In standard heterogeneous reconstruction
+    mode, the mask instead defines the region of interest in which structural
+    variability is analyzed. For biological interpretation, the most useful
+    masks are usually those that include the structurally relevant core while
+    excluding solvent regions and irrelevant peripheral density. Since the
+    protocol validates that masks are binary, masks should always be prepared
+    accordingly before execution.
+
+    The protocol optionally downsamples particle images before training. This
+    option is primarily intended to reduce GPU memory requirements when working
+    with large box sizes. Downsampling makes training substantially more
+    accessible on limited hardware, although it reduces the effective spatial
+    resolution of the learned volumes. During metadata preparation, input
+    volumes and masks are automatically resized to the working box size, and
+    particle metadata are updated consistently so that later alignment and
+    reconstruction remain geometrically coherent.
+
+    Training is controlled through a set of neural network hyperparameters.
+    These include the latent dimensionality, which determines how much
+    conformational variability can be represented, the number of epochs, the
+    batch size, and the learning rate. In biological terms, the latent
+    dimension defines the expressive capacity of the heterogeneity model:
+    smaller values encourage compact descriptions of motion, while larger
+    values allow more complex structural variability but may also capture
+    noise if used excessively. The protocol also includes a denoising
+    regularization term that encourages smoother reconstructions and can be
+    particularly helpful when analyzing noisy datasets.
+
+    The protocol supports several strategies for handling contrast transfer
+    effects. Depending on the selected option, the reference projections can be
+    CTF-filtered, particles can be Wiener-corrected, or the algorithm can
+    assume that CTF correction has already been applied previously. Choosing an
+    appropriate CTF strategy is important because alignment accuracy depends
+    strongly on the consistency between particle images and the model
+    projections generated during training.
+
+    Two related reconstruction philosophies are available. In mass transport
+    mode, the network explicitly models density displacement, which is often
+    more appropriate for large coherent motions. An optional implicit
+    architecture can be enabled in this regime to obtain richer local motion
+    descriptions, although at a higher GPU memory cost. When mass transport is
+    disabled, the protocol performs heterogeneous reconstruction instead. In
+    that case, local reconstruction can be enabled to focus the analysis on a
+    specific flexible region of the macromolecule rather than distributing
+    representational capacity over the full volume.
+
+    During execution, the protocol first prepares all metadata, resampling
+    volumes, masks, and particle stacks when necessary. It then launches
+    HetSIREN training and subsequently prediction. Prediction produces, for
+    every particle, an updated orientation, in-plane shifts, and a latent
+    coordinate. These latent coordinates are stored in the output particle set
+    together with the refined alignment parameters, making the output directly
+    usable for downstream flexible analysis, clustering, or visualization.
+
+    A second biologically important output is a representative set of decoded
+    volumes. After prediction, the latent space is clustered using k-means,
+    and the centers of those clusters are decoded into volumes that represent
+    characteristic conformational states sampled by the dataset. These decoded
+    maps are automatically rescaled to the original particle box size and
+    assigned the correct sampling rate. For biological interpretation, these
+    volumes often provide a convenient first overview of the principal motions
+    present in the experiment.
+
+    In practice, this protocol is most valuable when the goal is not only to
+    refine particle orientations but also to understand structural variability
+    in a continuous manner. When the biological system is expected to move
+    along smooth conformational trajectories rather than occupy sharply
+    separated states, the latent representation learned by HetSIREN often
+    provides a more faithful description than traditional discrete
+    classification approaches.
+
+    A good practical strategy is to begin with moderate latent dimensionality,
+    conservative denoising, and a biologically meaningful mask when the region
+    of motion is known. If strong large-scale motions are expected, mass
+    transport mode is often the most informative starting point. For more
+    localized flexibility or refinement of a known domain, local
+    reconstruction generally offers easier interpretation. As with all
+    heterogeneous cryo-EM analyses, the most reliable conclusions arise when
+    latent organization, decoded volumes, and known structural biology are
+    interpreted together rather than in isolation.
+    """
     _label = 'flexible align - HetSIREN'
     _lastUpdateVersion = VERSION_1
 

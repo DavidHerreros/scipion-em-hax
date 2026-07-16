@@ -39,7 +39,98 @@ import hax
 import hax.constants as const
 
 class JaxProtTrainFlexConsensus(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol to train a FlexConsensus network """
+    """
+    Protocol to train a FlexConsensus network. This protocol learns a common
+    latent representation from multiple flexible particle sets so that
+    heterogeneous conformational information produced by different flexible
+    analysis methods or independent datasets can be projected into a shared
+    consensus space.
+
+    AI Generated:
+
+    Train FlexConsensus (JaxProtTrainFlexConsensus) — User Manual
+
+    This protocol is designed to integrate several flexible cryo-EM latent
+    spaces into a single common representation. In many practical workflows,
+    different flexible reconstruction or heterogeneity analysis methods produce
+    their own latent coordinates. Although each latent space may capture
+    meaningful structural variability, direct comparison between them is often
+    difficult because the coordinate systems are method-dependent. FlexConsensus
+    addresses this problem by learning a consensus embedding that preserves the
+    biologically relevant variability shared across the input spaces.
+
+    The protocol takes as input multiple sets of flexible particles. Each input
+    particle set must already contain latent coordinates produced by a previous
+    flexible analysis protocol. During preparation, the protocol extracts the
+    latent vectors from every particle and stores them as numerical arrays. In
+    biological terms, this means that the network does not operate directly on
+    particle images or volumes, but rather on previously learned descriptors of
+    conformational variability.
+
+    An important concept in this protocol is the consensus latent dimension.
+    When left in automatic mode, the protocol determines the dimensionality of
+    the consensus space from the input spaces, choosing a dimension compatible
+    with all of them. This is generally the safest strategy for most users
+    because it avoids imposing an overly complex representation. Advanced users
+    may define the latent dimension manually when they want tighter control over
+    the compression level or when prior biological knowledge suggests the
+    expected complexity of the conformational landscape.
+
+    The neural network training is controlled through a compact set of
+    hyperparameters. The number of epochs determines how long the model learns
+    the shared structure of the latent spaces. The batch size controls memory
+    usage and optimization stability, which can be relevant when very large
+    particle sets are used. The learning rate governs how quickly the consensus
+    model adapts during optimization. In practice, conservative learning rates
+    are usually preferred because latent-space integration often benefits from
+    stable convergence rather than aggressive optimization.
+
+    The protocol also supports fine tuning. When enabled, an existing
+    FlexConsensus model can be reused and refined with additional datasets or
+    updated latent representations. This is particularly useful in iterative
+    biological projects where new particle subsets are added progressively or
+    when consensus representations are refined after upstream flexible analysis
+    improves.
+
+    During execution, all input latent spaces are first exported and organized
+    as independent numerical datasets. The training stage then learns a common
+    latent manifold that relates all input spaces. After training, a prediction
+    stage projects every input particle into that learned consensus space. This
+    prediction step is important because it provides a direct correspondence
+    between the original particle sets and the shared representation.
+
+    The output consists of one particle set for each input set. Each output
+    particle preserves the original particle metadata and alignment information,
+    but now includes a new reduced latent coordinate corresponding to the
+    consensus embedding. From a biological perspective, this makes it possible
+    to compare conformational states across datasets or across different
+    flexible reconstruction methods using a common coordinate system.
+
+    In addition to the consensus coordinates, the protocol reports two
+    quantitative quality measures for each particle. The consensus error
+    estimates how well the particle is represented in the common latent space,
+    while the representation error reflects how faithfully the original latent
+    information is preserved. These quantities can be useful for downstream
+    interpretation, for example when identifying particles that are poorly
+    represented in the shared manifold or when evaluating whether certain
+    datasets contribute incompatible structural information.
+
+    In practical cryo-EM analysis, this protocol is especially valuable when
+    several flexible analyses need to be interpreted jointly. For example,
+    different reconstruction methods may emphasize different aspects of
+    structural variability, or independent datasets may capture related but not
+    identical conformational landscapes. FlexConsensus provides a principled
+    way to unify those descriptions and examine their common structural trends.
+
+    A useful practical strategy is to begin with automatic latent dimensionality
+    and default optimization settings, then inspect the consensus and
+    representation errors. If the consensus space appears biologically coherent,
+    the resulting latent coordinates can be used for clustering, visualization,
+    or comparison of conformational trajectories across experiments. In this
+    sense, the protocol is not only a dimensionality reduction tool but also a
+    bridge for interpreting heterogeneous structural variability in a unified
+    biological framework.
+    """
     _label = 'train - FlexConsensus'
     _lastUpdateVersion = VERSION_1
 

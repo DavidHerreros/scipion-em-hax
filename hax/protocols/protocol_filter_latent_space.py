@@ -45,7 +45,125 @@ from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 import hax
 
 class JaxProtFilterLatents(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol to filter automatically latent conformational spaces"""
+    """
+    Protocol to filter automatically latent conformational spaces.
+
+    AI Generated:
+
+    Filter Latent Space (JaxProtFilterLatents) — User Manual
+        Overview
+
+        The Filter Latent Space protocol analyzes a previously computed latent conformational space and
+        automatically removes particles whose latent coordinates behave as outliers with respect to the
+        global conformational landscape. Its main purpose is to retain particles that belong to the
+        coherent manifold learned during flexible reconstruction while excluding isolated points that may
+        arise from poor alignments, reconstruction artifacts, or rare unstable conformations.
+
+        In practical cryo-EM flexible analysis, latent spaces often contain a dense continuous region
+        representing meaningful structural variability together with scattered points that do not follow
+        the same geometric organization. This protocol provides a convenient way to clean that latent
+        representation before downstream analysis such as clustering, trajectory exploration, volume
+        decoding, or conformational interpretation.
+
+        Inputs and General Workflow
+
+        The protocol requires as input a set of flexible particles, meaning particles that already carry
+        latent coordinates produced by a previous flexible reconstruction protocol. These latent vectors
+        represent each particle in a reduced conformational space where geometric proximity usually
+        reflects structural similarity.
+
+        During execution, the protocol first extracts the latent coordinates associated with every input
+        particle and stores them as a numerical latent matrix. This matrix is then passed to the
+        filtering engine, which evaluates the local neighborhood structure of each point in latent space.
+        After filtering is complete, only the particles whose latent coordinates satisfy the selected
+        acceptance criterion are copied into a new output particle set.
+
+        Because the output preserves the original particle metadata, this protocol behaves as a
+        conformational selection step rather than a new reconstruction step. It therefore fits naturally
+        between flexible embedding and later structural interpretation.
+
+        Neighborhood-Based Detection of Outliers
+
+        The central idea of the protocol is that meaningful conformational states tend to occupy locally
+        coherent regions of latent space. Each latent coordinate is compared to its nearest neighbors in
+        order to estimate whether it behaves like a regular member of the manifold or as an isolated
+        outlier.
+
+        The number of neighbors controls the scale at which the latent landscape is examined. Smaller
+        values emphasize very local structure and are useful when the conformational manifold contains
+        fine branches, subtle transitions, or narrow pathways. Larger values provide a broader view of
+        the latent organization and can be advantageous when the latent space is smooth and globally
+        continuous.
+
+        From a biological perspective, choosing too few neighbors may preserve tiny isolated clusters
+        that reflect noise rather than real structural states, whereas choosing too many neighbors may
+        oversmooth the landscape and remove legitimate but sparsely populated conformations.
+
+        Outlier Threshold and Biological Interpretation
+
+        The filtering decision is controlled by an outlier distance threshold expressed as a Z-score.
+        Particles whose latent coordinates fall within the accepted threshold are retained, while those
+        exceeding the threshold are discarded.
+
+        Lower thresholds produce stricter filtering. This is often useful when the latent space contains
+        obvious scattered points, strong reconstruction artifacts, or noisy regions that interfere with
+        interpretation. Higher thresholds are more permissive and may be preferable when exploring
+        heterogeneous systems where biologically meaningful states are expected to be rare or only weakly
+        populated.
+
+        In biological practice, this parameter should be interpreted conservatively. A particle that
+        appears as an outlier in latent space is not necessarily biologically irrelevant. Rare
+        intermediate states, transient motions, or low-population conformations may naturally occupy
+        sparse regions. For this reason, aggressive filtering should generally be followed by visual
+        inspection or independent validation.
+
+        Computational Considerations
+
+        The protocol allows the user to control batch size during latent filtering. This parameter mainly
+        affects GPU memory usage and computational throughput. Larger batches generally improve execution
+        efficiency on modern accelerators, whereas smaller batches can help when hardware resources are
+        limited.
+
+        GPU execution is supported but optional. Since the protocol operates directly on latent vectors
+        rather than raw particle images, its computational demands are usually moderate compared with
+        reconstruction or neural network training.
+
+        Outputs and Their Interpretation
+
+        The output is a new flexible particle set containing only the particles whose latent coordinates
+        passed the filtering criterion. Each output particle preserves the metadata and latent
+        representation of its original counterpart, but the overall set becomes restricted to the
+        selected conformational manifold.
+
+        This filtered set is particularly useful for downstream analyses that are sensitive to outliers.
+        Clustering becomes more stable, latent visualization becomes easier to interpret, and decoded
+        volumes tend to reflect cleaner conformational trends rather than isolated artifacts.
+
+        Importantly, the protocol does not modify latent coordinates. It only performs selection.
+        Therefore, the resulting dataset remains directly compatible with subsequent flexible analysis
+        tools.
+
+        Practical Recommendations
+
+        In most biological workflows, it is advisable to begin with moderate neighborhood values and a
+        conservative threshold, then inspect the latent distribution after filtering. When the original
+        latent space contains obvious isolated points far from the main manifold, filtering usually
+        improves interpretability substantially.
+
+        For highly flexible proteins, however, caution is essential. Sparse latent regions can sometimes
+        correspond to genuine conformational intermediates rather than noise. In these situations, a
+        permissive threshold is often preferable during exploratory analysis, followed by stricter
+        filtering only after the structural meaning of the landscape becomes clearer.
+
+        Final Perspective
+
+        For cryo-EM flexible analysis, latent filtering is best understood as a refinement of the
+        conformational landscape rather than a simple cleanup operation. By removing isolated latent
+        outliers while preserving the coherent manifold, the protocol helps reveal the dominant
+        structural organization of heterogeneous datasets. Used carefully, it improves downstream
+        interpretability without replacing biological judgment about which conformational states are
+        meaningful.
+    """
     _label = 'filter latent space'
     _lastUpdateVersion = VERSION_1
 

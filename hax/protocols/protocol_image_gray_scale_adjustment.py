@@ -46,7 +46,162 @@ from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 import hax
 
 class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol for image gray values adjustment with the Image Gray Scale Adjustment algorithm."""
+    """
+    Adjusts particle image gray-scale values using a neural-network-based image intensity
+    normalization strategy driven by projections generated from a reference volume. The
+    protocol learns how experimental particle intensities differ from synthetic projections
+    and estimates corrections that make the particle dataset more internally consistent for
+    downstream reconstruction, alignment, or flexible analysis.
+
+    AI Generated:
+
+    Image Adjustment (JaxProtImageAdjustment) — User Manual
+
+        Overview
+
+        The Image Adjustment protocol is intended to correct systematic gray-value
+        discrepancies between experimental particle images and projections derived from a
+        reference volume. In practical cryo-EM workflows, particles may differ in global
+        intensity scaling, offset, or local gray-value behavior because of acquisition
+        conditions, preprocessing differences, detector normalization, or dataset merging.
+        These differences can degrade the consistency between experimental images and
+        reference-based modeling.
+
+        This protocol uses a neural-network-based image gray-scale adjustment algorithm to
+        learn those discrepancies directly from the data. It predicts how each particle
+        should be adjusted so that the experimental observations better match the reference
+        projections. Biologically, this does not change the structural information contained
+        in the particles, but it improves the numerical consistency of the dataset, which
+        can facilitate more stable downstream refinement and interpretation.
+
+        Inputs and General Workflow
+
+        The protocol requires a particle set together with a reference volume. The reference
+        volume is essential because it provides the projections used as the target
+        statistical representation during training. Without this volume, the protocol cannot
+        estimate meaningful gray-scale corrections.
+
+        An optional binary reconstruction mask may also be provided. When used, the network
+        focuses the estimation on a biologically relevant region of the projection rather
+        than on the full image. This is often advantageous when particles contain large
+        solvent regions, disordered peripheral densities, or substantial background
+        variation.
+
+        Before training begins, the protocol converts the reference volume into an internal
+        format, rescales it if necessary so that its dimensions match the input particle
+        box size, and ensures that the sampling rate remains consistent. If a mask is
+        provided, the same dimensional consistency is enforced. Particle metadata are then
+        written into the internal metadata representation used by the network.
+
+        Adjustment Modes
+
+        The protocol supports two related adjustment strategies.
+
+        In projection-level adjustment mode, the network predicts a global linear
+        correction for each particle. In this case, the output includes two parameters
+        describing the gray-value transformation. These values can be interpreted as the
+        global intensity rescaling and offset needed to bring the experimental image into
+        better agreement with the corresponding reference projection.
+
+        In per-pixel adjustment mode, the protocol estimates a more flexible correction
+        directly at the pixel level. This mode is more expressive and may better capture
+        local intensity differences, although it can also be more computationally demanding
+        and potentially more sensitive to noise.
+
+        From a biological standpoint, projection-level adjustment is usually sufficient for
+        routine normalization problems, whereas per-pixel adjustment becomes more relevant
+        when local detector artifacts, uneven background behavior, or subtle image-domain
+        distortions are suspected.
+
+        CTF Treatment
+
+        The protocol allows optional consideration of the contrast transfer function. This
+        determines how reference projections are matched to the experimental particles.
+
+        When CTF correction is disabled, the protocol ignores the microscope transfer
+        function. This may be acceptable in exploratory tests but is generally less
+        realistic.
+
+        When enabled, the reference projections can be compared under different correction
+        assumptions, including direct application of the CTF, Wiener filtering, or
+        precorrected data. The biologically appropriate choice depends on how the input
+        particles were preprocessed earlier in the workflow.
+
+        Network Training and Computational Behavior
+
+        The protocol trains a neural network using the provided particles, the reference
+        volume, and the selected optimization parameters. The user can control latent-space
+        dimension, number of epochs, batch size, and learning rate.
+
+        The latent dimension controls the internal compact representation used by the model.
+        In most biological applications, this parameter mainly affects the flexibility of
+        the learned correction rather than directly encoding structural heterogeneity.
+
+        The number of epochs determines how long the network learns from the dataset. Larger
+        datasets often require more epochs, while smaller datasets may converge more
+        quickly.
+
+        Batch size controls GPU memory usage. Increasing batch size usually improves
+        throughput but may require substantially more memory.
+
+        Learning rate determines optimization stability. If the network becomes unstable or
+        produces numerical divergence, reducing the learning rate is usually the first
+        corrective action.
+
+        Fine Tuning and Data Loading
+
+        The protocol supports both training from scratch and fine tuning of a previously
+        trained network. Fine tuning is useful when working with related datasets acquired
+        under similar experimental conditions, since previously learned intensity behavior
+        can often transfer effectively.
+
+        Data loading can be performed either directly in RAM or through lazy loading with
+        optional SSD scratch storage. In large-scale cryo-EM facilities, using fast SSD
+        storage often provides a favorable compromise between speed and memory usage.
+
+        Outputs and Their Interpretation
+
+        After prediction, the protocol produces a new particle set containing the adjusted
+        images. The original particle metadata and alignment information are preserved.
+
+        In projection-level adjustment mode, each output particle also stores the estimated
+        gray-value adjustment parameters. These parameters are often useful for diagnostic
+        interpretation, since they provide a direct indication of how strongly each
+        particle needed to be corrected.
+
+        From a practical biological perspective, the adjusted particle set is usually best
+        interpreted as a normalized dataset with improved statistical consistency relative
+        to the supplied structural reference. This can be particularly useful before
+        reconstruction, refinement, or flexible analysis when intensity mismatches would
+        otherwise introduce unwanted variability.
+
+        Validation and Practical Considerations
+
+        The protocol requires a valid reference volume. If no volume is provided, execution
+        is prevented because no meaningful projection-based comparison can be performed.
+
+        If a mask is supplied, it must be binary. Non-binary masks are rejected because the
+        protocol assumes a strict distinction between included and excluded regions during
+        optimization.
+
+        In routine biological workflows, it is usually advisable to begin with global
+        projection-level adjustment using a biologically reliable reference volume and a
+        conservative mask focused on the stable core of the structure. Per-pixel prediction
+        should generally be reserved for cases where global normalization is clearly
+        insufficient.
+
+        Final Perspective
+
+        Image intensity normalization is often treated as a purely technical preprocessing
+        step, but in practice it can strongly influence downstream structural analysis.
+        Better consistency between particle images and reference projections can improve the
+        robustness of learning-based methods and reduce unwanted non-structural variation.
+
+        For this reason, the Image Adjustment protocol is best understood not as a
+        structural reconstruction method, but as a quantitative harmonization step that
+        helps ensure that subsequent cryo-EM analysis focuses more on biological signal and
+        less on acquisition-related intensity differences.
+    """
     _label = 'predict - Image Adjustment '
     _lastUpdateVersion = VERSION_1
 
