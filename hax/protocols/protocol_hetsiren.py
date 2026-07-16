@@ -49,7 +49,247 @@ import hax
 import hax.constants as const
 
 class JaxProtFlexibleAlignmentHetSiren(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol for angular alignment with heterogeneous reconstruction with the HetSIREN algorithm."""
+    """
+    Protocol for angular alignment with heterogeneous reconstruction with the HetSIREN algorithm.
+
+    AI Generated:
+
+    Flexible Align – HetSIREN (JaxProtFlexibleAlignmentHetSiren) — User Manual
+        Overview
+
+        The Flexible Align – HetSIREN protocol performs angular alignment and
+        heterogeneous reconstruction of cryo-EM particle images using the
+        HetSIREN deep-learning framework. Unlike conventional refinement
+        methods that aim to recover a single consensus structure, this
+        protocol simultaneously estimates particle orientations, latent
+        conformational coordinates, and a model of structural heterogeneity.
+
+        Its main purpose is to describe conformational variability directly
+        from the particle images. For biological users, this protocol is
+        particularly useful when the sample exhibits continuous motions,
+        flexible domains, or multiple structural states that would otherwise
+        be blurred in a standard reconstruction.
+
+        In practical cryo-EM workflows, this protocol allows users to recover
+        conformational landscapes, improve alignment under structural
+        heterogeneity, and generate representative volumes describing
+        biologically meaningful states.
+
+        Inputs and General Workflow
+
+        The protocol requires a set of input particles. Optionally, the user
+        may also provide a starting reference volume and a binary
+        reconstruction mask.
+
+        The computational workflow consists of three main stages.
+
+        First, the protocol prepares all inputs in a common internal format.
+        Particle metadata are written to Xmipp format, input volumes and
+        masks are converted to MRC when needed, and optional downsampling can
+        be applied.
+
+        Second, HetSIREN performs network training. During this stage, the
+        model learns particle orientations, latent conformational
+        coordinates, and a flexible reconstruction model.
+
+        Third, the trained network predicts latent coordinates for all
+        particles and reconstructs representative conformational volumes.
+
+        Starting Volume
+
+        Providing a starting reference volume is optional. Its role depends
+        strongly on the biological question and the reconstruction strategy.
+
+        A reference map is usually recommended when mass transport mode is
+        enabled, since the network benefits from a meaningful initial
+        structural state from which density can be displaced.
+
+        It is also highly advisable when local reconstruction is enabled,
+        where the analysis focuses on a selected region of the structure.
+
+        In contrast, when mass transport is disabled and local reconstruction
+        is not used, it is often preferable not to provide an input map.
+        This gives HetSIREN more freedom to denoise the data and infer
+        heterogeneous states directly from particle images.
+
+        From a biological perspective, this choice matters because an
+        over-constrained starting map may bias the recovered conformational
+        landscape.
+
+        Reconstruction Mask
+
+        The protocol accepts an optional binary mask. Its meaning depends on
+        the selected reconstruction mode.
+
+        When mass transport is enabled, the mask determines which voxels can
+        move inside the volume. In this regime, the network estimates
+        density motion rather than purely local reconstruction.
+
+        When mass transport is disabled, the mask defines the region where
+        reconstruction is allowed. Voxels outside the mask remain fixed and
+        structural variability outside that region will not be modeled.
+
+        For biological interpretation, the mask should include both the
+        stable structural core and any regions expected to undergo
+        conformational changes.
+
+        The protocol validates the mask to ensure it is binary. Non-binary
+        masks are rejected because they would lead to ambiguous behavior
+        during reconstruction.
+
+        Downsampling and Memory Considerations
+
+        Cryo-EM particle images may exceed available GPU memory, especially
+        when working with large box sizes.
+
+        To address this, the protocol allows optional particle downsampling
+        before training.
+
+        Downsampling reduces GPU memory usage and accelerates training, but
+        also limits the maximum recoverable spatial detail.
+
+        In exploratory analyses or hardware-limited environments,
+        downsampling is often a practical compromise. For high-resolution
+        biological interpretation, however, it should be used conservatively.
+
+        Network Training
+
+        The central stage of the protocol is neural-network training with
+        HetSIREN.
+
+        During training, the network learns:
+
+            - angular alignment parameters,
+            - latent conformational variables,
+            - heterogeneous 3D reconstructions.
+
+        Several hyperparameters control this optimization.
+
+        The latent space dimension determines how much conformational
+        variability can be represented. Smaller latent spaces enforce simpler
+        motions, while larger spaces can capture more complex structural
+        heterogeneity.
+
+        The number of epochs controls how long the network is trained.
+        Typical datasets often require between 50 and 100 epochs, although
+        this depends strongly on dataset size.
+
+        Batch size determines how many particles are processed
+        simultaneously. Increasing it improves GPU efficiency but may reduce
+        sensitivity to subtle local motions.
+
+        The learning rate controls optimization speed and stability. Values
+        that are too high may cause unstable training, while values that are
+        too small may slow convergence substantially.
+
+        The denoising strength acts as a regularization parameter. Moderate
+        values can improve robustness to noise, but excessively strong
+        denoising may suppress genuine biological signal.
+
+        CTF Handling
+
+        The protocol provides several CTF correction modes.
+
+        Available options include:
+
+            - None
+            - Apply
+            - Wiener
+            - Precorrect
+
+        This flexibility allows the protocol to adapt to different upstream
+        preprocessing strategies.
+
+        Biologically, consistency is important. The selected CTF mode should
+        match the way particles were previously processed.
+
+        Reconstruction Modes
+
+        The protocol supports two main reconstruction strategies.
+
+        Mass Transport Mode
+
+        In this mode, HetSIREN explicitly models density displacement inside
+        the masked region.
+
+        This is particularly useful for:
+
+            - large-amplitude domain motions,
+            - highly flexible assemblies,
+            - situations where the same density moves substantially across
+              conformations.
+
+        An optional implicit architecture can also be enabled. This may
+        improve local motion modeling but increases GPU memory consumption.
+
+        Local Reconstruction Mode
+
+        When mass transport is disabled, the protocol can perform local
+        heterogeneous reconstruction.
+
+        In this regime, variability is modeled only inside the masked region.
+
+        This mode is especially useful when studying localized motions such
+        as flexible loops, ligand-induced rearrangements, or small domain
+        shifts.
+
+        Outputs and Their Interpretation
+
+        After execution, the protocol produces two biologically relevant
+        outputs.
+
+        Output Particles
+
+        A new particle set is generated where each particle contains:
+
+            - updated angular alignment parameters,
+            - updated in-plane shifts,
+            - learned latent conformational coordinates.
+
+        This output can be used for downstream conformational analyses or
+        further flexible refinement.
+
+        Output Volumes
+
+        The protocol computes representative latent-space cluster centers
+        using k-means clustering and decodes them into a set of
+        representative 3D volumes.
+
+        By default, twenty representative volumes are produced.
+
+        Biologically, these volumes provide a compact summary of the
+        conformational landscape learned by HetSIREN.
+
+        Practical Recommendations
+
+        For most biological applications, it is often advisable to start
+        with moderate latent dimensionality, default learning rate, and
+        conservative denoising.
+
+        When the sample is known to undergo large structural rearrangements,
+        mass transport mode is often the most appropriate choice.
+
+        When interest is focused on a localized region of variability, local
+        reconstruction with an appropriate binary mask usually provides
+        clearer biological interpretation.
+
+        Downsampling can be very useful during exploratory runs, but final
+        biologically meaningful analyses should ideally be performed at the
+        highest practical sampling.
+
+        Final Perspective
+
+        For cryo-EM users, HetSIREN is not simply an alignment protocol. It
+        is a framework for learning structural heterogeneity directly from
+        particle images.
+
+        The biological value of the results depends strongly on careful
+        selection of masks, reconstruction mode, training parameters, and
+        interpretation of the latent conformational space.
+
+        When used thoughtfully, this protocol provides a powerful route to
+        visualize and quantify continuous molecular flexibility.
+    """
     _label = 'flexible align - HetSIREN'
     _lastUpdateVersion = VERSION_1
 

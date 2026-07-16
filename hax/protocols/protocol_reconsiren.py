@@ -50,7 +50,217 @@ import hax.constants as const
 
 
 class JaxProtAngularAlignmentReconSiren(ProtAnalysis3D, ProtFlexBase):
-    """ Ab initio reconstruction and global assignation with ReconSIREN neural network."""
+    """
+    Performs ab initio reconstruction and angular assignment of particles using the ReconSIREN neural network.
+    The protocol can either estimate particle orientations and reconstruct a 3D map from scratch, or refine
+    an existing volume and/or pre-existing particle alignment information.
+
+    AI Generated:
+
+    Angular Align – ReconSIREN (JaxProtAngularAlignmentReconSiren) — User Manual
+        Overview
+
+        The Angular Align – ReconSIREN protocol estimates particle orientations, in-plane shifts, and a
+        corresponding 3D reconstruction directly from experimental particle images using the ReconSIREN
+        neural network.
+
+        Its main goal is to jointly solve two problems that are central in cryo-EM:
+        assigning a projection direction to each particle and reconstructing the underlying 3D map.
+        Depending on the inputs, the protocol can operate in two modes:
+
+        - Ab initio mode, where no prior volume is provided and both the angular assignment and the
+          initial reconstruction are learned from scratch.
+
+        - Refinement mode, where an initial reference volume and/or previous particle alignment are
+          available and the network refines them.
+
+        In biological practice, this protocol is useful when studying new datasets without an available
+        structural model, when refining difficult heterogeneous data, or when improving an initial
+        reconstruction while simultaneously refining particle poses.
+
+        Inputs and General Workflow
+
+        The protocol requires a set of input particles.
+
+        If particles do not contain alignment information, ReconSIREN learns orientations and shifts
+        directly from the images.
+
+        If particles already contain projection alignment parameters, the protocol can optionally refine
+        those assignments.
+
+        An optional starting volume may also be provided.
+
+        - Without an input volume, the network estimates both particle orientations and a new 3D map
+          from scratch.
+
+        - With an input volume, the protocol performs refinement of angular assignment and optionally
+          refinement of the volume itself.
+
+        This flexibility makes the protocol suitable both for early exploratory reconstruction and for
+        later refinement stages in cryo-EM workflows.
+
+        Reconstruction Mask
+
+        A reconstruction mask can optionally be provided.
+
+        The mask determines which spatial region contains the mass available to reconstruct or refine
+        the volume.
+
+        This parameter is biologically important because it strongly influences what the network
+        interprets as signal.
+
+        The mask must be binary.
+
+        Practical recommendations depend on the workflow:
+
+        If no initial volume is provided:
+        a circular mask is usually recommended. A practical default is approximately one quarter of the
+        box size radius for compact particles. Larger masks may be preferable for membrane proteins,
+        nanodiscs, or particles occupying a large fraction of the box.
+
+        If an input volume is provided:
+        a binary mask generated from the reference volume is generally preferable. Slight dilation of
+        the mask can help the network preserve peripheral density while refining the reconstruction.
+
+        Poor masks can introduce instability, excessive noise learning, or biologically misleading maps.
+
+        Downsampling and Computational Strategy
+
+        Input particles may be downsampled to a smaller box size before training.
+
+        This reduces GPU memory requirements and can substantially accelerate execution.
+
+        In practical terms, downsampling is useful when working with large particles or limited GPU
+        resources. The trade-off is reduced spatial detail in the reconstructed volumes.
+
+        For exploratory analyses, moderate downsampling is often acceptable. For final biological
+        interpretation, users should remember that aggressive downsampling may limit recoverable
+        structural detail.
+
+        CTF Handling
+
+        The protocol supports several strategies for contrast transfer function handling:
+
+        - None: CTF is ignored.
+        - Apply: CTF is applied to the projection generated from the current model.
+        - Wiener: input particles are Wiener corrected.
+        - Precorrect: assumes particles were already corrected beforehand.
+
+        From a biological perspective, the correct choice depends on upstream preprocessing.
+
+        For most standard workflows, the default Apply mode is a sensible starting point.
+        Wiener correction may help when the dataset has already been prepared accordingly.
+        Incorrect CTF handling can degrade both angular assignment and reconstruction quality.
+
+        Alignment Refinement
+
+        If the input particles already contain alignment parameters, the protocol can refine the current
+        angular assignment.
+
+        This is particularly useful when particles come from previous classification, initial model
+        estimation, or external reconstruction workflows.
+
+        Instead of learning orientations from scratch, the network starts from the current assignment
+        and improves it.
+
+        In practice, this often accelerates convergence and stabilizes difficult datasets.
+
+        Volume Refinement
+
+        When an input volume is provided, the user can decide whether the map itself should be refined.
+
+        If refinement is enabled, ReconSIREN updates both the angular assignment and the volume.
+
+        If refinement is disabled, the protocol only estimates orientations and shifts relative to the
+        fixed reference volume.
+
+        This second option can be especially useful when the provided reference is already high quality,
+        for example one derived from a high-resolution reconstruction or an atomic model.
+
+        Symmetry
+
+        The protocol allows the use of cyclic and dihedral symmetry groups.
+
+        Symmetry is incorporated during learning of angular assignment and reconstruction.
+
+        Biologically, this can significantly improve stability and reconstruction quality for symmetric
+        macromolecular complexes.
+
+        Even when symmetry is used, the protocol stores particle orientations as symmetry-broken
+        assignments in c1. This makes the resulting orientations directly usable in downstream
+        refinement and reconstruction protocols.
+
+        Neural Network Training
+
+        ReconSIREN is trained directly on the particle images.
+
+        The main hyperparameters are:
+
+        - Number of epochs, controlling how many times the dataset is revisited.
+        - Batch size, controlling GPU memory usage and training throughput.
+        - Learning rate, controlling optimization step size.
+
+        In practical cryo-EM use, the default settings usually provide a good starting point.
+
+        Larger datasets often require more epochs.
+        Limited GPU memory may require reducing the batch size.
+        If training becomes unstable or diverges, reducing the learning rate is usually the first
+        recommended adjustment.
+
+        Fine Tuning
+
+        The protocol can also fine-tune a previously trained ReconSIREN model.
+
+        This is useful when incorporating additional particles, extending previous analyses, or refining
+        an already converged network with related data.
+
+        Instead of starting from random initialization, training resumes from an existing network state.
+
+        Outputs and Their Interpretation
+
+        After execution, the protocol produces three main outputs.
+
+        Output particles:
+        Each particle receives updated angular parameters, shifts, and a latent representation learned
+        by the network. These particles can be directly used in downstream flexible analysis or further
+        reconstruction workflows.
+
+        Output reconstructed volume:
+        A consensus 3D map is generated and rescaled to the original particle box size.
+
+        Output heterogeneous volumes:
+        Additional heterogeneous maps may also be produced when present. These represent alternative
+        structural states learned during reconstruction and may help reveal conformational variability.
+
+        All output volumes preserve the sampling rate of the input particles.
+
+        Practical Recommendations
+
+        For new datasets without a prior structural model, running the protocol in ab initio mode is
+        often the natural starting point.
+
+        When a reliable initial reconstruction exists, providing it usually improves convergence and
+        angular stability.
+
+        A carefully chosen binary mask often provides one of the strongest improvements, especially for
+        flexible or elongated complexes.
+
+        Downsampling can greatly reduce computational cost during exploratory runs, but final biological
+        interpretation should preferably rely on minimally downsampled data.
+
+        When particles already contain approximate alignment information, enabling refinement of current
+        assignments generally improves efficiency.
+
+        Final Perspective
+
+        ReconSIREN combines angular assignment and reconstruction into a single learning framework.
+
+        For cryo-EM users, this means the protocol is not simply estimating orientations: it is jointly
+        learning the geometric organization of the particles and the corresponding 3D structural model.
+
+        Its strength is especially evident in difficult datasets where traditional reconstruction and
+        orientation assignment become strongly coupled problems.
+    """
     _label = 'angular align - ReconSIREN'
     _lastUpdateVersion = VERSION_2_0
 

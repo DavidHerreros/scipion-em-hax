@@ -46,7 +46,215 @@ from xmipp3.convert import writeSetOfParticles, matrixFromGeometry
 import hax
 
 class JaxProtImageAdjustment(ProtAnalysis3D, ProtFlexBase):
-    """ Protocol for image gray values adjustment with the Image Gray Scale Adjustment algorithm."""
+    """
+    Protocol for image gray values adjustment with the Image Gray Scale Adjustment algorithm.
+
+    AI Generated:
+
+    Image Adjustment (JaxProtImageAdjustment) — User Manual
+        Overview
+
+        The Image Adjustment protocol estimates and applies gray-scale corrections to a set of
+        experimental particle images using a reference 3D volume. Its main purpose is to reduce
+        systematic intensity inconsistencies between experimental projections and reference-based
+        projections, improving downstream compatibility for reconstruction, alignment, or neural
+        network–based heterogeneous analysis.
+
+        In cryo-EM workflows, this protocol is especially useful when particle images show
+        acquisition-dependent contrast differences, normalization mismatches, or intensity
+        distortions that can negatively affect learning-based reconstruction methods.
+
+        Inputs and General Workflow
+
+        The protocol requires a set of input particles and a reference volume.
+
+        The reference volume is used to generate projections that serve as intensity references
+        during network training. These reference projections are compared against the experimental
+        particle images so that the network can learn how gray values should be adjusted.
+
+        Optionally, a binary mask can also be provided. The mask restricts the learning process
+        to a biologically relevant region of the volume, preventing solvent or background regions
+        from dominating the intensity estimation.
+
+        The general workflow consists of three stages:
+
+            1. Input preparation
+               The reference volume is converted and resized if necessary so that its dimensions
+               match the particle box size. If a mask is provided, it is also resized accordingly.
+
+            2. Network training and prediction
+               A neural network is trained to estimate gray-scale corrections between particle
+               images and volume projections.
+
+            3. Output generation
+               Adjusted particle images are written to a new output set while preserving particle
+               metadata and acquisition information.
+
+        Reference Volume Preparation
+
+        The reference volume is mandatory.
+
+        Before training, the protocol automatically checks whether the input volume matches the
+        particle dimensions. If not, the volume is resized in Fourier space to preserve frequency
+        information as much as possible.
+
+        From a biological perspective, the quality of the reference map strongly influences the
+        quality of the correction. A well-resolved and biologically representative map generally
+        produces more reliable gray-scale estimation.
+
+        If the selected reference does not adequately represent the particle population, the
+        learned correction may become biased.
+
+        Masking Strategy
+
+        The optional reconstruction mask helps the protocol focus only on the region of interest.
+
+        This is particularly useful when particles contain substantial solvent background,
+        micelle signal, support film contamination, or flexible peripheral regions that should
+        not dominate the intensity correction.
+
+        If no mask is provided, the protocol still runs, but the network may use the full volume
+        projection during optimization.
+
+        The mask must be binary. Non-binary masks are explicitly rejected during validation.
+
+        Correction Modes
+
+        The protocol supports two adjustment prediction modes.
+
+        Per-projection adjustment
+            In this mode, the network predicts a global correction for each image.
+            Two scalar parameters are estimated for every particle:
+
+                - a_adjustment
+                - b_adjustment
+
+            This mode is computationally lighter and usually sufficient when intensity
+            differences are mostly global.
+
+        Per-pixel adjustment
+            In this mode, the network predicts local gray-scale corrections at pixel level.
+
+            This mode is more flexible and can capture local intensity variation, but it is
+            computationally more demanding and may require more training data for stable behavior.
+
+        In practical cryo-EM use, per-projection correction is usually a good starting point,
+        while per-pixel adjustment is more appropriate when images show strong local contrast
+        variability.
+
+        CTF Handling
+
+        The protocol allows several strategies for handling the Contrast Transfer Function (CTF).
+
+        None
+            The CTF is ignored.
+
+        Apply
+            The CTF is applied to the projection generated from the reference volume.
+
+        Wiener
+            Experimental images are Wiener-corrected before adjustment.
+
+        Precorrect
+            The protocol assumes the data were already CTF-corrected upstream.
+
+        In biological workflows, choosing the correct CTF mode is important because intensity
+        behavior strongly depends on whether CTF effects remain present in the particle images.
+
+        Training Parameters
+
+        Several network hyperparameters control learning behavior.
+
+        Latent space dimension
+            Defines the bottleneck size of the neural network.
+
+        Epochs
+            Controls how many passes are performed over the dataset.
+
+        Batch size
+            Determines GPU memory usage and the degree of stochasticity during optimization.
+
+        Learning rate
+            Controls convergence speed and stability.
+
+        In routine practice, the default parameters usually provide a reasonable starting point.
+        Larger datasets may benefit from more epochs, while GPU memory limitations are typically
+        addressed by reducing batch size.
+
+        Memory Management
+
+        The protocol supports two data-loading strategies.
+
+        Lazy loading into RAM
+            Images are loaded directly into memory when possible, offering the best performance.
+
+        SSD scratch mode
+            If RAM loading is disabled, temporary data can be placed on a fast SSD or NVMe device.
+
+        This becomes particularly important for large particle datasets or large image box sizes,
+        where I/O performance may become a major bottleneck.
+
+        GPU Execution
+
+        The protocol supports GPU acceleration.
+
+        If enabled, the selected GPU device is passed directly to the external
+        image_gray_scale_adjustment program.
+
+        GPU acceleration is especially important because both training and prediction are neural
+        network operations and may become computationally expensive for large datasets.
+
+        Outputs and Their Interpretation
+
+        The protocol generates a new SetOfParticles as output.
+
+        For each output particle:
+
+            - The adjusted image is stored as the new particle location.
+            - Original metadata and acquisition parameters are preserved.
+
+        When per-projection adjustment is selected, each particle additionally stores:
+
+            - a_adjustment
+            - b_adjustment
+
+        These values can be interpreted as global intensity correction coefficients applied to
+        that particular image.
+
+        Practical Recommendations
+
+        In typical cryo-EM workflows, it is often advisable to begin with:
+
+            - a biologically representative reference volume
+            - a binary mask covering the stable core
+            - per-projection correction
+            - default learning parameters
+
+        If particles show strong local intensity heterogeneity, per-pixel adjustment may provide
+        better correction but should be used with additional caution.
+
+        When working with noisy datasets, selecting an appropriate mask often improves the
+        biological relevance of the learned corrections more than tuning network hyperparameters.
+
+        Validation Rules
+
+        Before execution, the protocol verifies two critical conditions:
+
+            - A reference volume must be provided
+            - If a mask is supplied, it must be strictly binary
+
+        These checks help prevent unstable or biologically meaningless training behavior.
+
+        Final Perspective
+
+        Image gray-scale adjustment is not simply a numerical normalization step.
+
+        In cryo-EM analysis, intensity consistency strongly affects the quality of downstream
+        reconstruction, heterogeneity analysis, and machine-learning–based inference.
+
+        A carefully chosen reference volume, appropriate masking, and realistic correction mode
+        are the main elements for obtaining biologically meaningful adjusted particle images.
+    """
     _label = 'predict - Image Adjustment '
     _lastUpdateVersion = VERSION_1
 

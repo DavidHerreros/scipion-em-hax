@@ -26,7 +26,324 @@ import hax.constants as const
 
 
 class JaxProtTrainZernike3Deep(ProtAnalysis3D, ProtFlexBase):
-    """Protocol to train a FlexConsensus network"""
+    """
+    Trains a Zernike3Deep neural network to model continuous conformational
+    variability by learning latent-space representations and deformation fields
+    that warp a reference volume toward experimental particle images.
+
+    AI Generated:
+
+    Train Zernike3Deep (JaxProtTrainZernike3Deep) — User Manual
+        Overview
+
+        The Train Zernike3Deep protocol learns continuous structural
+        heterogeneity directly from experimental particle images.
+
+        Its main goal is to estimate how a reference volume must deform to
+        explain the conformational variability present in the dataset.
+
+        Instead of reconstructing a single consensus structure, this protocol
+        learns a latent representation where each particle is assigned a point
+        in conformational space. This makes it particularly useful for
+        studying flexible macromolecular complexes, domain motions, and
+        continuous structural transitions.
+
+        In practical cryo-EM workflows, Zernike3Deep is typically used when
+        the user suspects that the particle population does not belong to a
+        small set of discrete classes, but instead spans a continuum of
+        conformations.
+
+        Inputs and General Workflow
+
+        The protocol requires two mandatory inputs:
+
+        1. A set of experimental particles.
+        2. A reference input volume.
+
+        The reference volume acts as the structural template that will be
+        smoothly deformed toward the observed particle projections.
+
+        Optionally, a binary input mask may also be provided.
+
+        This mask defines which mass is allowed to move during deformation.
+
+        If no mask is supplied, the protocol automatically creates a circular
+        3D mask that encloses the reconstruction region.
+
+        Before training, the protocol prepares the data by:
+
+        - converting the input volume to internal Xmipp format,
+        - resizing the volume when needed,
+        - resizing the mask when needed,
+        - writing particle metadata,
+        - optionally downsampling the particle images.
+
+        If subtomogram labels exist in the input particles, these labels are
+        preserved in the metadata.
+
+        Downsampling and Computational Efficiency
+
+        The protocol optionally supports particle downsampling before training.
+
+        This is useful when:
+
+        - GPU memory is limited,
+        - particles are very large,
+        - exploratory runs are desired.
+
+        Downsampling reduces computational cost and memory usage, but it also
+        reduces the highest recoverable spatial resolution.
+
+        Internally, the protocol automatically corrects the sampling rate after
+        downsampling so that geometric consistency is preserved.
+
+        Masking: Defining the Deformable Region
+
+        The input mask is biologically important because it determines which
+        parts of the reference volume are allowed to deform.
+
+        A good mask should:
+
+        - enclose all mass that may move,
+        - exclude large solvent regions,
+        - avoid disconnected irrelevant densities.
+
+        In flexible systems, a good mask improves stability and prevents the
+        model from wasting degrees of freedom on noise or empty space.
+
+        The protocol requires the mask to be binary.
+
+        Non-binary masks are rejected during validation.
+
+        CTF Handling
+
+        Several CTF strategies are available:
+
+        - None:
+          CTF is ignored.
+
+        - Apply:
+          CTF is applied to projections generated from the reference map.
+
+        - Wiener:
+          Particle images are Wiener corrected.
+
+        - Precorrect:
+          Particle images are assumed to be already corrected.
+
+        The selected CTF handling should be consistent with the preprocessing
+        history of the particle dataset.
+
+        Learning Strategy
+
+        During training, the network learns:
+
+        - a latent-space embedding for each particle,
+        - angular assignments,
+        - in-plane shifts,
+        - deformation coefficients describing how the reference map must warp.
+
+        The most important learning hyperparameters are:
+
+        Latent dimension
+
+        Controls the dimensionality of conformational space.
+
+        Small latent dimensions encourage compact global descriptions.
+
+        Larger latent dimensions allow richer flexibility but may increase
+        overfitting risk.
+
+        Number of epochs
+
+        Controls how many complete passes through the dataset are performed.
+
+        Batch size
+
+        Determines how many particle images are loaded into GPU memory at once.
+
+        Learning rate
+
+        Controls optimization step size and convergence stability.
+
+        Zernike3D Basis Parameters
+
+        The deformation model is based on Zernike3D basis functions.
+
+        Two parameters define the flexibility of the deformation field:
+
+        L1 — Zernike degree
+
+        Controls the degree of Zernike polynomials.
+
+        Higher values allow more complex conformational changes.
+
+        L2 — Spherical harmonics degree
+
+        Controls angular complexity of the deformation basis.
+
+        In practice:
+
+        - larger L1 and L2 provide greater flexibility,
+        - smaller values impose smoother and simpler motions.
+
+        A practical constraint is that the Zernike degree should be greater
+        than or equal to the spherical harmonics degree.
+
+        Gaussian Reference Approximation
+
+        Before learning particle deformations, the protocol approximates the
+        reference volume with a Gaussian representation.
+
+        By default, the number of Gaussians is determined automatically.
+
+        Optionally, the user may manually fix the number of Gaussians.
+
+        This may be useful when biological prior knowledge exists, for example:
+
+        - approximate residue count,
+        - known molecular segmentation,
+        - desired reconstruction compactness.
+
+        Checkpoint Reuse and Training Continuation
+
+        The protocol supports checkpoint reuse.
+
+        When enabled, training resumes from a previous run rather than
+        starting from scratch.
+
+        This is useful when:
+
+        - extending previous training,
+        - continuing interrupted jobs,
+        - refining models with more epochs.
+
+        Data Loading Strategy
+
+        Two loading modes are supported:
+
+        RAM loading
+
+        Particle images are loaded directly into memory for maximum speed.
+
+        Lazy loading
+
+        Images are memory-mapped from disk.
+
+        This reduces RAM usage but may reduce performance.
+
+        When lazy loading is used, an SSD or NVMe scratch folder is strongly
+        recommended.
+
+        Training and Prediction Workflow
+
+        The execution consists of two stages.
+
+        Training
+
+        The network is trained using:
+
+        - particles,
+        - reference volume,
+        - mask,
+        - CTF handling,
+        - Zernike basis parameters,
+        - network hyperparameters.
+
+        Prediction
+
+        After training, the protocol runs prediction mode to estimate for each
+        particle:
+
+        - latent coordinates,
+        - refined orientations,
+        - refined in-plane shifts.
+
+        Outputs: Flexible Particles
+
+        The protocol generates a flexible particle set.
+
+        Each output particle contains:
+
+        - latent-space coordinates,
+        - refined projection alignment,
+        - refined shifts.
+
+        In addition, the output flexible particle set stores:
+
+        - the trained Zernike3Deep model path,
+        - the reference volume,
+        - the deformation mask,
+        - the CTF strategy.
+
+        This output is intended for downstream continuous heterogeneity
+        analysis.
+
+        Outputs: Representative Volumes
+
+        The protocol also generates representative decoded volumes.
+
+        Internally, the workflow performs:
+
+        1. K-means clustering in latent space.
+        2. Selection of 20 representative latent states.
+        3. Decoding of these states into volumes.
+
+        These decoded volumes provide a biologically interpretable sampling of
+        conformational space.
+
+        Before final output:
+
+        - decoded volumes are resized back to the original particle box size,
+        - sampling rate is restored.
+
+        Biological Interpretation
+
+        The decoded volumes should not be interpreted as strict discrete
+        classes.
+
+        Instead, they represent representative snapshots along a continuous
+        conformational landscape.
+
+        This is particularly useful for:
+
+        - visualizing domain motions,
+        - exploring flexible transitions,
+        - identifying continuous trajectories.
+
+        Validation Rules
+
+        Before execution, the protocol validates the input mask.
+
+        If a mask is supplied, all voxel values must lie within [0, 1].
+
+        Non-binary masks are rejected.
+
+        Practical Recommendations
+
+        In routine biological use, the following strategy is usually effective:
+
+        - start with moderate latent dimension,
+        - use default Zernike degrees initially,
+        - use downsampling for exploratory runs,
+        - provide a biologically meaningful binary mask,
+        - inspect decoded volumes before increasing model complexity.
+
+        For highly flexible complexes, increasing L1 and L2 may reveal richer
+        motions, but excessive flexibility may also fit noise.
+
+        Final Perspective
+
+        Zernike3Deep is not a standard reconstruction protocol.
+
+        Its real strength lies in learning continuous structural variability
+        from particle images while preserving a physically interpretable
+        deformation model.
+
+        For cryo-EM studies focused on conformational landscapes rather than
+        single consensus maps, this protocol provides a powerful framework for
+        extracting biologically meaningful flexibility.
+    """
 
     _label = "train - Zernike3Deep"
     _lastUpdateVersion = VERSION_1

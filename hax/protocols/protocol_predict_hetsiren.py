@@ -49,7 +49,204 @@ import hax
 import hax.constants as const
 
 class JaxProtPredictHetSiren(ProtAnalysis3D, ProtFlexBase):
-    """ Predict particle poses with map decoding with the HetSIREN network. """
+    """
+    Predicts particle poses and latent coordinates using a previously trained
+    HetSIREN network, and optionally decodes representative heterogeneous volumes.
+
+    AI Generated:
+
+    Predict HetSIREN (JaxProtPredictHetSiren) — User Manual
+        Overview
+
+        The Predict HetSIREN protocol applies a previously trained HetSIREN model
+        to a new set of particles in order to estimate per-particle orientations,
+        in-plane shifts, and latent coordinates describing conformational variability.
+
+        From a biological perspective, this protocol is mainly used when a HetSIREN
+        model has already learned the structural heterogeneity of a system and the
+        user wants to project additional particles into that learned conformational
+        landscape. This is particularly useful when processing new datasets,
+        validating a trained model on independent particles, or assigning particles
+        to previously identified structural states.
+
+        Inputs and General Workflow
+
+        The protocol requires two main inputs:
+
+        1. A set of particles to be predicted.
+        2. A previously trained HetSIREN protocol.
+
+        The trained HetSIREN protocol provides all structural context required for
+        prediction, including:
+
+        - the trained neural network,
+        - latent dimensionality,
+        - input reference volume,
+        - reconstruction mask,
+        - CTF handling strategy,
+        - downsampling settings,
+        - reconstruction mode.
+
+        In practice, this means prediction is fully constrained by the original
+        training configuration. New particles are therefore interpreted in the same
+        conformational space learned during training.
+
+        Metadata Preparation
+
+        Before prediction, the protocol converts the input particles into Xmipp
+        metadata format.
+
+        If the original HetSIREN training used downsampling, the protocol rescales
+        the new particles to the same box size. This step is critical because the
+        prediction network expects exactly the same dimensional input as during
+        training.
+
+        If the trained HetSIREN protocol contains a reference volume, that volume
+        is copied and resized if necessary.
+
+        If a binary mask was used during training, the same mask is also copied and
+        resized. If no mask was originally provided, the protocol automatically
+        creates a spherical mask.
+
+        Biologically, this ensures that the new particles are interpreted under
+        the same structural assumptions as the training dataset.
+
+        Prediction Step
+
+        The prediction stage runs the HetSIREN neural network in prediction mode.
+
+        For each particle, the network estimates:
+
+        - latent coordinates,
+        - Euler angles,
+        - translational shifts.
+
+        The prediction uses exactly the same physical interpretation learned during
+        training, including sampling rate correction if downsampling was applied.
+
+        The protocol automatically inherits several key settings from the trained
+        model:
+
+        CTF handling
+            The same CTF treatment used during training is reused during prediction.
+            This is essential because changes in CTF preprocessing may alter the
+            statistical consistency between training and prediction particles.
+
+        Reconstruction mode
+            If the trained network used mass transport, prediction also uses mass
+            transport.
+            If implicit architecture was enabled, that option is reused.
+            If local reconstruction was used instead, the same local reconstruction
+            mode is applied.
+
+        From a biological perspective, these inherited settings guarantee that the
+        predicted particles remain embedded in the same structural model learned by
+        the original network.
+
+        Memory and I/O Strategy
+
+        The protocol provides two ways of loading particle data:
+
+        Lazy loading into RAM
+            Particles are loaded directly into memory.
+            This is faster when enough RAM is available.
+
+        SSD scratch folder
+            If lazy loading is disabled, temporary memory-mapped files can be stored
+            on a fast SSD or NVMe device.
+
+        For large cryo-EM datasets, this option can strongly affect runtime.
+        Although it does not change biological interpretation, it can make prediction
+        substantially more practical on large particle sets.
+
+        Output Particles
+
+        After prediction, the protocol creates a new flexible particle set.
+
+        Each output particle contains:
+
+        - the original particle information,
+        - predicted latent coordinates,
+        - updated rigid-body transformation,
+        - links to the trained HetSIREN model,
+        - reference map information,
+        - reference mask information,
+        - CTF mode metadata.
+
+        The latent coordinates define the particle position in the conformational
+        space learned during training.
+
+        The rigid-body transformation is reconstructed from the predicted Euler
+        angles and translational shifts.
+
+        Biologically, the resulting particle set becomes a direct representation of
+        how the new particles populate the learned heterogeneity landscape.
+
+        Decoding Representative Volumes
+
+        A particularly useful feature of this protocol is the decoding of
+        representative heterogeneous volumes.
+
+        The predicted latent coordinates are clustered using K-means into
+        20 representative conformational centers.
+
+        These cluster centers are then decoded into 3D volumes using the trained
+        HetSIREN decoder.
+
+        The decoded maps are finally resized back to the original particle box size
+        and assigned the proper sampling rate.
+
+        From a biological point of view, these decoded volumes provide a compact
+        visualization of the main conformational states sampled by the new dataset.
+
+        This is especially useful for:
+
+        - inspecting dominant structural states,
+        - comparing conformational distributions across datasets,
+        - exploring whether new particles populate previously unseen regions of
+          conformational space.
+
+        Validation
+
+        The protocol validates the binary mask inherited from the training protocol.
+
+        If a mask is provided, it must contain only values between 0 and 1.
+
+        This validation is important because non-binary masks may lead to ambiguous
+        structural constraints during prediction.
+
+        Practical Recommendations
+
+        In routine cryo-EM applications, the most important recommendation is to use
+        prediction only with particles that are compatible with the original
+        training dataset.
+
+        Good practice includes:
+
+        - similar particle preprocessing,
+        - compatible box size,
+        - similar sampling rate,
+        - similar molecular composition.
+
+        If the new particles differ strongly from the training data, the predicted
+        latent coordinates may still be mathematically valid but biologically
+        misleading.
+
+        When comparing multiple datasets, this protocol becomes especially valuable
+        because all particles are projected into the same learned conformational
+        reference frame.
+
+        Final Perspective
+
+        Predict HetSIREN is not simply a pose prediction tool.
+
+        It is best understood as a transfer step that projects new experimental
+        particles into an already learned heterogeneity model.
+
+        For biological interpretation, this allows users to compare datasets,
+        recover representative conformational states, and study how new particles
+        distribute within an existing structural landscape.
+    """
     _label = 'predict - HetSIREN'
     _lastUpdateVersion = VERSION_1
 
