@@ -434,7 +434,7 @@ class JaxProtTrainZernike3Deep(ProtAnalysis3D, ProtFlexBase):
         inputVolume = self.inputVolume.get().getFileName()
         partSet.getFlexInfo().refMap = String(inputVolume)
 
-        if self.inputVolumeMask.get().getFileName() is not None:
+        if self.inputVolumeMask.get():
             inputMask = self.inputVolumeMask.get().getFileName()
         else:
             inputMask = self._getExtraPath("mask.mrc")
