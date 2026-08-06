@@ -1,6 +1,6 @@
 # **************************************************************************
 # *
-# * Authors:     Eduardo García Delgado (eduardo.garcia@cnb.csic.es) [1]
+# * Authors:     Eduardo Garc?a Delgado (eduardo.garcia@cnb.csic.es) [1]
 # *
 # * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC [1]
 # *
@@ -77,10 +77,6 @@ class JaxProtRigidFitting(ProtAnalysis3D, ProtFlexBase):
                       help='When set to Yes, it will be taken into account the previous alignment and, therefore, only this method will serve as a validation '
                            'for rigid fitted atomic structures into pre-aligned systems.')
 
-        form.addParam('needsCentering', params.BooleanParam, default=False, label='Is it required centering?',
-                      help='When set to Yes, it will apply a shift transformation on the atomic structure '
-                           'to be on the same global frame as the volume (for example, while computing the FSC).')
-
         form.addParallelSection(threads=1, mpi=4)
 
     # --------------------------- INSERT steps functions -----------------------
@@ -101,9 +97,6 @@ class JaxProtRigidFitting(ProtAnalysis3D, ProtFlexBase):
 
         if self.isAligned.get():
             args += '--is_aligned '
-
-        if self.needsCentering.get():
-            args += '--needsCentering '
 
         if self.useGpu.get():
             gpu = str(self.getGpuList()[0])
@@ -135,23 +128,10 @@ class JaxProtRigidFitting(ProtAnalysis3D, ProtFlexBase):
             outputPdb.setFileName(out_path_pdb)
             self._defineOutputs(outputStructure=outputPdb)
 
-        if not self.needsCentering:
-            outVol = Volume()
-            outVol.setSamplingRate(self.inputVolume.get().getSamplingRate())
-            outVol.setFileName(out_path_vol)
-            self._defineOutputs(outputVolume=outVol)
-        else:
-            out_path_vol_center = os.path.join(self._getExtraPath('pdb_fitted'), 'final_rigid_center.mrc')
-
-            outVol1 = Volume()
-            outVol1.setSamplingRate(self.inputVolume.get().getSamplingRate())
-            outVol1.setFileName(out_path_vol)
-            self._defineOutputs(outputVolume=outVol1)
-
-            outVol2 = Volume()
-            outVol2.setSamplingRate(self.inputVolume.get().getSamplingRate())
-            outVol2.setFileName(out_path_vol_center)
-            self._defineOutputs(outputVolumeCenter=outVol2)
+        outVol = Volume()
+        outVol.setSamplingRate(self.inputVolume.get().getSamplingRate())
+        outVol.setFileName(out_path_vol)
+        self._defineOutputs(outputVolume=outVol)
 
     # --------------------------- INFO functions -----------------------------
     def _summary(self):
